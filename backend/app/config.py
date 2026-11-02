@@ -12,7 +12,9 @@ OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 # Gemini: официальный OpenAI-совместимый шлюз
 # https://ai.google.dev/gemini-api/docs/openai
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
-GEMINI_DEFAULT_MODEL = "gemini-3.8-flash"
+# Быстрая и бесплатная модель по умолчанию (проверено: ~1 с на короткий ответ).
+# Альтернативы для качества: gemini-3.6-flash, gemini-3.5-flash, gemini-3.8-flash.
+GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite"
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
 
@@ -58,9 +60,16 @@ class Settings(BaseSettings):
     ai_base_url: str = OPENAI_DEFAULT_BASE_URL
     ai_api_key: str = ""
     ai_model: str = "gpt-4o-mini"
+    # Управление «размышлением» модели (Gemini 3.x/4, reasoning-модели):
+    #   minimal | low | medium | high | none | пусто (не передавать).
+    # Для Gemini по умолчанию minimal — заметно быстрее, чем режим по умолчанию.
+    ai_reasoning_effort: str = ""
     ai_temperature: float = 0.6
-    ai_timeout_sec: float = 90.0
-    ai_max_retries: int = 2
+    ai_timeout_sec: float = 45.0
+    ai_max_retries: int = 1
+    # После сбоя живого провайдера (квота 429, сеть) столько секунд сразу
+    # работаем офлайн, не пытаясь снова ждать ответа от внешней модели.
+    ai_failure_cooldown_sec: int = 120
     ai_extra_headers: dict[str, str] = {}
 
     # Статическая сборка фронтенда (отдаётся FastAPI)

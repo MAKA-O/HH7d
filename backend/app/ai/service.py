@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -31,6 +32,9 @@ class AIServiceImpl(AIService):
     def __init__(self) -> None:
         self._live = self._build_live()
         self._offline = self._build_offline()
+        # Предохранитель: после сбоя живой модели не ждём её снова заданное время.
+        self._live_off_until = 0.0
+        self._cooldown_sec = max(30.0, float(settings.ai_failure_cooldown_sec))
         if self._live is None and self._offline is None:
             logger.error("ИИ-слой не инициализирован: нет ни live-, ни offline-движка")
         logger.info(
@@ -74,12 +78,27 @@ class AIServiceImpl(AIService):
             raise RuntimeError("Офлайн-движок ИИ недоступен")
         return getattr(self._offline, method)(**kwargs)
 
+    # ------------------------------------------------------- предохранитель
+    def _breaker_active(self) -> bool:
+        """True, если недавно был сбой и мы пока работаем офлайн без ожидания."""
+        return self._live is not None and time.monotonic() < self._live_off_until
+
+    def _trip_breaker(self, exc: BaseException | str) -> None:
+        self._live_off_until = time.monotonic() + self._cooldown_sec
+        logger.warning(
+            "Живой ИИ недоступен (%s). Следующие %.0f с работаем в офлайн-режиме.",
+            exc,
+            self._cooldown_sec,
+        )
+
     def _dispatch(self, method: str, /, **kwargs: Any) -> Any:
-        if self._live is not None:
+        if self._breaker_active():
+            logger.info("Провайдер %s: офлайн-режим по предохранителю", method)
+        elif self._live is not None:
             try:
                 return self._live_call(method, **kwargs)
             except Exception as exc:
-                logger.warning("Провайдер %s упал (%s), переключаюсь на офлайн-движок", method, exc)
+                self._trip_breaker(exc)
         return self._offline_call(method, **kwargs)
 
     # --- вопросы ---
@@ -110,14 +129,14 @@ class AIServiceImpl(AIService):
     def chat_stream(
         self, *, messages: list[dict[str, str]], context: str | None = None
     ) -> Iterator[str]:
-        if self._live is not None:
+        if self._live is not None and not self._breaker_active():
             try:
                 stream = self._live.chat_stream(messages=messages, context=context)
                 first = next(stream)
             except StopIteration:
                 return
             except Exception as exc:
-                logger.warning("Поток живого провайдера недоступен (%s), офлайн-режим", exc)
+                self._trip_breaker(exc)
             else:
                 yield first
                 try:
@@ -125,6 +144,8 @@ class AIServiceImpl(AIService):
                 except Exception as exc:  # обрыв посреди потока
                     logger.warning("Поток живого провайдера прервался: %s", exc)
                 return
+        if self._offline is None:
+            raise RuntimeError("ИИ-слой недоступен")
         yield from self._offline.chat_stream(messages=messages, context=context)
 
     # --- служебное ---
@@ -138,13 +159,20 @@ class AIServiceImpl(AIService):
             return None
 
     def health(self) -> AIHealthInfo:
-        if self._live is not None:
+        if self._live is not None and not self._breaker_active():
             try:
                 info = self._live.health()
                 if info.available:
                     return info
+                self._trip_breaker(info.message or "health-check не пройден")
             except Exception as exc:  # pragma: no cover
-                logger.warning("Проверка здоровья живой модели не удалась: %s", exc)
+                self._trip_breaker(exc)
         if self._offline is None:
             raise RuntimeError("ИИ-слой недоступен")
-        return self._offline.health()
+        info = self._offline.health()
+        if self._live is not None:
+            info.message = (
+                "Живой ИИ временно недоступен (квота/ошибка) — "
+                "включён офлайн-режим, всё работает без задержек"
+            )
+        return info

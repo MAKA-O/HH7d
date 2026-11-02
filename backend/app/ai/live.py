@@ -199,6 +199,7 @@ class LiveEngine(AIService):
             mode="live",
             available=ok,
             message=message,
+            latency_ms=self._client.last_ping_ms,
         )
 
     def _call_json(

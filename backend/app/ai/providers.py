@@ -91,6 +91,7 @@ class LLMClient:
         max_retries: int | None = None,
         extra_headers: dict[str, str] | None = None,
         transcription_model: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.base_url = (base_url if base_url is not None else settings.ai_base_url).strip().rstrip("/")
         self.api_key = (api_key if api_key is not None else settings.ai_api_key).strip()
@@ -102,12 +103,19 @@ class LLMClient:
         self.max_retries = max(0, int(settings.ai_max_retries if max_retries is None else max_retries))
         self.extra_headers = dict(settings.ai_extra_headers if extra_headers is None else extra_headers)
         self.transcription_model = transcription_model or DEFAULT_TRANSCRIPTION_MODEL
+        self.reasoning_effort = (
+            settings.ai_reasoning_effort if reasoning_effort is None else reasoning_effort
+        ).strip()
         self._client: httpx.Client | None = None
         # Без ключа API работают только локальные серверы (Ollama).
         self._key_optional = (settings.ai_provider or "auto").lower() == "ollama"
         # Кэш результата health-проверки, чтобы опросы UI не тратили токены.
-        self._ping_cache: tuple[float, tuple[bool, str]] | None = None
-        self._ping_ttl_sec = 60.0
+        self._ping_cache: tuple[float, tuple[bool, str], float | None] | None = None
+        self._ping_ttl_sec = 300.0
+        # Замер последней проверки — отдаётся в /api/ai/health.
+        self.last_ping_ms: float | None = None
+        # Параметры, которые провайдер уже отверг (чтобы не повторять 400 каждый раз).
+        self._unsupported_params: set[str] = set()
 
     # ----------------------------------------------------------- настройки
     @property
@@ -152,6 +160,25 @@ class LLMClient:
     def _backoff(attempt: int) -> float:
         return min(0.6 * (2**attempt), 3.0)
 
+    def _drop_unsupported_params(self, payload: dict[str, Any], exc: Exception) -> bool:
+        """Убирает необязательный параметр, который не принял провайдер (HTTP 400/422)."""
+        text = str(exc)
+        if "HTTP 400" not in text and "HTTP 422" not in text:
+            return False
+        for key in ("response_format", "reasoning_effort"):
+            if key in payload:
+                payload.pop(key, None)
+                self._unsupported_params.add(key)
+                logger.info(
+                    "Провайдер не принял %s — запоминаю и больше не отправляю", key
+                )
+                return True
+        return False
+
+    @staticmethod
+    def _log_latency(label: str, seconds: float) -> None:
+        logger.info("LLM %s: %.2f с", label, seconds)
+
     def _request(
         self,
         method: str,
@@ -193,6 +220,25 @@ class LLMClient:
                 raise LLMError(
                     f"Не удалось связаться с LLM-провайдером ({self.base_url}): {exc}"
                 ) from exc
+            if response.status_code == 429:
+                snippet = response.text[:300].replace("\n", " ")
+                quota_exhausted = any(
+                    marker in snippet.lower()
+                    for marker in ("quota", "resource_exhausted", "billing")
+                )
+                logger.warning(
+                    "LLM-провайдер: 429 (лимит/квота)%s: %s",
+                    " — повтор не поможет" if quota_exhausted else "",
+                    snippet,
+                )
+                response.close()
+                if quota_exhausted or attempt >= attempts - 1:
+                    raise LLMError(
+                        "Лимит/квота LLM-провайдера исчерпаны (HTTP 429). "
+                        f"{snippet[:220]}"
+                    )
+                time.sleep(self._backoff(attempt))
+                continue
             if response.status_code in RETRYABLE_STATUSES and attempt < attempts - 1:
                 last_error = f"HTTP {response.status_code}"
                 snippet = response.text[:200].replace("\n", " ")
@@ -261,8 +307,10 @@ class LLMClient:
             "temperature": float(self.temperature if temperature is None else temperature),
             "stream": stream,
         }
-        if json_mode:
+        if json_mode and "response_format" not in self._unsupported_params:
             payload["response_format"] = {"type": "json_object"}
+        if self.reasoning_effort and "reasoning_effort" not in self._unsupported_params:
+            payload["reasoning_effort"] = self.reasoning_effort
         if max_tokens:
             payload["max_tokens"] = int(max_tokens)
         return payload
@@ -276,7 +324,11 @@ class LLMClient:
         max_tokens: int | None = None,
         timeout: float | None = None,
     ) -> str:
-        """Один запрос к модели; возвращает текст ответа."""
+        """Один запрос к модели; возвращает текст ответа.
+
+        Если провайдер не поддерживает необязательный параметр (``response_format``
+        или ``reasoning_effort``), запрос повторяется без него.
+        """
         payload = self._chat_payload(
             messages,
             json_mode=json_mode,
@@ -284,17 +336,19 @@ class LLMClient:
             max_tokens=max_tokens,
             stream=False,
         )
-        try:
-            data = self._post_json("/chat/completions", payload, timeout=timeout)
-            return self._extract_message_text(data)
-        except LLMError as exc:
-            # Некоторые локальные серверы не поддерживают response_format.
-            if not (json_mode and ("HTTP 400" in str(exc) or "HTTP 422" in str(exc))):
+        started = time.monotonic()
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                data = self._post_json("/chat/completions", payload, timeout=timeout)
+                text = self._extract_message_text(data)
+                self._log_latency(f"запрос (попытка {attempt + 1})", time.monotonic() - started)
+                return text
+            except LLMError as exc:
+                if attempt < attempts - 1 and self._drop_unsupported_params(payload, exc):
+                    continue
                 raise
-            logger.info("Провайдер не принял response_format, повторяю без JSON-режима")
-            payload.pop("response_format", None)
-            data = self._post_json("/chat/completions", payload, timeout=timeout)
-            return self._extract_message_text(data)
+        raise LLMError("Не удалось получить ответ модели")  # pragma: no cover
 
     def chat_stream(
         self,
@@ -312,7 +366,9 @@ class LLMClient:
             stream=True,
         )
         url = f"{self.base_url}/chat/completions"
-        attempts = self.max_retries + 1
+        attempts = self.max_retries + 2  # +1 запас на отказ от необязательного параметра
+        started = time.monotonic()
+        first_token_logged = False
         for attempt in range(attempts):
             received = False
             try:
@@ -325,14 +381,28 @@ class LLMClient:
                 ) as response:
                     if response.status_code >= 400:
                         body = response.read().decode("utf-8", errors="replace")[:300]
-                        raise LLMError(
+                        error = LLMError(
                             f"LLM-провайдер вернул HTTP {response.status_code}: {body}"
                         )
+                        if (
+                            not received
+                            and attempt < attempts - 1
+                            and self._drop_unsupported_params(payload, error)
+                        ):
+                            continue
+                        raise error
                     for piece in _iter_sse_deltas(response):
+                        if not first_token_logged:
+                            first_token_logged = True
+                            logger.info(
+                                "LLM поток: первый токен через %.2f с",
+                                time.monotonic() - started,
+                            )
                         received = True
                         yield piece
                 if not received:
                     raise LLMError("Модель не вернула потоковый ответ")
+                self._log_latency("поток", time.monotonic() - started)
                 return
             except LLMError:
                 if received or attempt >= attempts - 1:
@@ -377,23 +447,29 @@ class LLMClient:
 
         Сначала пробуем ``GET /models``. Если провайдер его не поддерживает
         (так ведёт себя OpenAI-совместимый шлюз Gemini), проверяем минимальным
-        chat-запросом. Результат кэшируется на минуту.
+        chat-запросом. Замер задержки сохраняется в ``last_ping_ms``,
+        результат кэшируется на 5 минут.
         """
         if not self.configured:
             return False, "Ключ API не задан — доступен только офлайн-режим"
         now = time.monotonic()
         if use_cache and self._ping_cache is not None:
-            cached_at, cached_result = self._ping_cache
+            cached_at, cached_result, cached_ms = self._ping_cache
             if now - cached_at < self._ping_ttl_sec:
+                self.last_ping_ms = cached_ms
                 return cached_result
-        result = self._ping_uncached()
-        self._ping_cache = (now, result)
-        return result
+        ok, message, elapsed_ms = self._ping_uncached()
+        self.last_ping_ms = elapsed_ms
+        self._ping_cache = (now, (ok, message), elapsed_ms)
+        return ok, message
 
-    def _ping_uncached(self) -> tuple[bool, str]:
+    def _ping_uncached(self) -> tuple[bool, str, float]:
+        started = time.monotonic()
         try:
             models = self.list_models(timeout=min(max(self.timeout, 3.0), 10.0))
         except LLMError as exc:
+            # Некоторые OpenAI-совместимые шлюзы не отдают /models —
+            # проверяем коротким chat-запросом.
             logger.info("Провайдер не отдал /models (%s), проверяю chat-запросом", exc)
             try:
                 self.chat(
@@ -402,16 +478,20 @@ class LLMClient:
                     timeout=min(max(self.timeout, 5.0), 20.0),
                 )
             except LLMError as chat_exc:
-                return False, f"LLM-провайдер недоступен: {chat_exc}"
-            return True, "Модель отвечает (проверка chat-запросом: /models недоступен)"
+                seconds = time.monotonic() - started
+                return False, f"Модель недоступна: {chat_exc}", seconds * 1000.0
+            seconds = time.monotonic() - started
+            return True, f"Модель отвечает за {seconds:.1f} с", seconds * 1000.0
+        seconds = time.monotonic() - started
         if models and self.model and not any(
             self.model == item or self.model in item for item in models
         ):
             return (
                 True,
-                f"Провайдер отвечает, но модель «{self.model}» отсутствует в списке /models",
+                f"Провайдер отвечает за {seconds:.1f} с, но модель «{self.model}» отсутствует в /models",
+                seconds * 1000.0,
             )
-        return True, "Модель отвечает"
+        return True, f"Модель отвечает за {seconds:.1f} с", seconds * 1000.0
 
     # --------------------------------------------------------- транскрипция
     def transcribe(self, *, audio: bytes, filename: str, language: str | None = "ru") -> str:

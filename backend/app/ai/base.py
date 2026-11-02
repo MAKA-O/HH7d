@@ -74,6 +74,7 @@ class AIHealthInfo(BaseModel):
     mode: Literal["live", "offline"]
     available: bool
     message: str = ""
+    latency_ms: float | None = None
 
 
 class AIService(ABC):
