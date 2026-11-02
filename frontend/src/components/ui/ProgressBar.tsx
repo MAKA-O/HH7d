@@ -1,14 +1,12 @@
 import { cn } from '@/lib/cn'
 
-export type ProgressTone = 'accent' | 'emerald' | 'amber' | 'rose' | 'sky' | 'violet'
+export type ProgressTone = 'accent' | 'positive' | 'caution' | 'negative'
 
 const TONE_CLASSES: Record<ProgressTone, string> = {
-  accent: 'from-accent-500 to-violet-400',
-  emerald: 'from-emerald-500 to-teal-400',
-  amber: 'from-amber-500 to-orange-400',
-  rose: 'from-rose-500 to-pink-400',
-  sky: 'from-sky-500 to-cyan-400',
-  violet: 'from-violet-500 to-fuchsia-400',
+  accent: 'bg-accent',
+  positive: 'bg-positive',
+  caution: 'bg-caution',
+  negative: 'bg-negative',
 }
 
 interface ProgressBarProps {
@@ -21,19 +19,20 @@ interface ProgressBarProps {
   className?: string
 }
 
-/** Тонкий прогресс-бар с подписями. */
+/** Тонкий прогресс-бар без градиентов: сплошная заливка семантического цвета. */
 export function ProgressBar({ value, tone = 'accent', size = 'md', label, valueLabel, className }: ProgressBarProps) {
   const safeValue = Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0))
+  const barHeight = size === 'sm' ? 'h-1' : 'h-1.5'
   return (
     <div className={cn('space-y-1.5', className)}>
       {label || valueLabel ? (
-        <div className="flex items-baseline justify-between gap-3 text-xs">
-          <span className="truncate text-slate-300">{label}</span>
-          <span className="shrink-0 font-medium text-slate-400">{valueLabel}</span>
+        <div className="flex items-baseline justify-between gap-3 text-13">
+          <span className="truncate text-fg-2">{label}</span>
+          <span className="shrink-0 font-medium tabular-nums text-fg">{valueLabel}</span>
         </div>
       ) : null}
       <div
-        className={cn('w-full overflow-hidden rounded-full bg-white/10', size === 'sm' ? 'h-1.5' : 'h-2')}
+        className={cn('w-full overflow-hidden rounded-full bg-surface-2', barHeight)}
         role="progressbar"
         aria-valuenow={Math.round(safeValue)}
         aria-valuemin={0}
@@ -41,7 +40,7 @@ export function ProgressBar({ value, tone = 'accent', size = 'md', label, valueL
         aria-label={label}
       >
         <div
-          className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-500', TONE_CLASSES[tone])}
+          className={cn('h-full rounded-full transition-[width] duration-500', TONE_CLASSES[tone])}
           style={{ width: `${safeValue}%` }}
         />
       </div>
@@ -49,11 +48,11 @@ export function ProgressBar({ value, tone = 'accent', size = 'md', label, valueL
   )
 }
 
-/** Цвет прогресса по баллу 0–10. */
+/** Семантический цвет прогресса по баллу 0–10. */
 export function toneByScore(score: number | null | undefined): ProgressTone {
   if (score == null || Number.isNaN(score)) return 'accent'
-  if (score >= 8) return 'emerald'
-  if (score >= 6) return 'sky'
-  if (score >= 4) return 'amber'
-  return 'rose'
+  if (score >= 8) return 'positive'
+  if (score >= 6) return 'accent'
+  if (score >= 4) return 'caution'
+  return 'negative'
 }

@@ -1,7 +1,6 @@
 /**
  * Справочники для подписей и цветов: коды из API (docs/API.md) → русские названия.
- * Значения, пришедшие из /api/meta, имеют приоритет; эти словари — фолбэк
- * и источник оформления (цвета, иконки, порядок).
+ * Значения из /api/meta имеют приоритет; эти словари — фолбэк и источник оформления.
  */
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -80,6 +79,11 @@ export const SEVERITY_LABELS: Record<string, string> = {
 
 export const SEVERITY_ORDER: string[] = ['critical', 'major', 'minor', 'nit']
 
+export interface CodeTitleOption {
+  code: string
+  title: string
+}
+
 export const LANGUAGES: CodeTitleOption[] = [
   { code: 'python', title: 'Python' },
   { code: 'javascript', title: 'JavaScript' },
@@ -88,11 +92,6 @@ export const LANGUAGES: CodeTitleOption[] = [
   { code: 'c++', title: 'C++' },
   { code: 'sql', title: 'SQL' },
 ]
-
-export interface CodeTitleOption {
-  code: string
-  title: string
-}
 
 export const CODE_TOPIC_SUGGESTIONS = [
   'Алгоритмы и структуры данных',
@@ -111,39 +110,52 @@ export function labelOf(dict: Record<string, string>, code: string | null | unde
   return dict[code] ?? code
 }
 
-/** Цвета бейджа сложности вопроса/задачи. */
+/** Классы бейджа сложности вопроса/задачи. */
 export function difficultyClasses(difficulty: string | null | undefined): string {
   switch (difficulty) {
     case 'easy':
-      return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+      return 'border-positive/25 bg-positive-soft text-positive'
     case 'medium':
-      return 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+      return 'border-caution/25 bg-caution-soft text-caution'
     case 'hard':
-      return 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+      return 'border-negative/25 bg-negative-soft text-negative'
     default:
-      return 'bg-white/5 text-slate-300 border-white/10'
+      return 'border-line bg-surface-2 text-fg-2'
   }
 }
 
-/** Цвета бейджа статуса сессии. */
-export function statusClasses(status: string): string {
-  return status === 'completed'
-    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-    : 'bg-sky-500/10 text-sky-300 border-sky-500/20'
+/** Тон бейджа статуса сессии. */
+export function statusTone(status: string): 'positive' | 'accent' {
+  return status === 'completed' ? 'positive' : 'accent'
 }
 
-/** Цвета для severity замечаний код-ревью. */
+/** Классы бейджа статуса сессии (для мест, где нужен className). */
+export function statusClasses(status: string): string {
+  return status === 'completed'
+    ? 'border-positive/25 bg-positive-soft text-positive'
+    : 'border-accent/25 bg-accent-soft text-accent'
+}
+
+/** Тон замечания код-ревью. */
+export function severityTone(severity: string): 'negative' | 'caution' | 'neutral' {
+  switch (severity) {
+    case 'critical':
+      return 'negative'
+    case 'major':
+      return 'caution'
+    default:
+      return 'neutral'
+  }
+}
+
+/** Классы бейджа severity. */
 export function severityClasses(severity: string): string {
   switch (severity) {
     case 'critical':
-      return 'bg-rose-500/10 text-rose-300 border-rose-500/25'
+      return 'border-negative/25 bg-negative-soft text-negative'
     case 'major':
-      return 'bg-orange-500/10 text-orange-300 border-orange-500/25'
-    case 'minor':
-      return 'bg-amber-500/10 text-amber-300 border-amber-500/25'
-    case 'nit':
-      return 'bg-slate-500/10 text-slate-300 border-slate-500/25'
+      return 'border-caution/25 bg-caution-soft text-caution'
     default:
-      return 'bg-white/5 text-slate-300 border-white/10'
+      return 'border-line bg-surface-2 text-fg-2'
   }
 }

@@ -38,7 +38,9 @@ export function LoginPage() {
       navigate(redirectTo, { replace: true })
     } catch (caught) {
       setError(
-        caught instanceof ApiError ? caught.detail : 'Не удалось войти. Проверьте соединение с сервером и повторите попытку.',
+        caught instanceof ApiError
+          ? caught.detail
+          : 'Не удалось войти. Проверьте соединение с сервером и повторите попытку.',
       )
     } finally {
       setSubmitting(false)
@@ -48,19 +50,22 @@ export function LoginPage() {
   return (
     <AuthLayout
       title="Вход в аккаунт"
-      subtitle="Продолжите подготовку: ваши сессии, оценки и история сохраняются."
+      subtitle="Продолжите подготовку: сессии, оценки и история сохраняются за вами."
       footer={
         <p>
           Нет аккаунта?{' '}
-          <Link to="/register" className="font-medium text-accent-300 transition hover:text-accent-200">
-            Зарегистрируйтесь
+          <Link to="/register" className="text-link">
+            Зарегистрироваться
           </Link>
         </p>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error ? (
-          <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-3 text-sm text-rose-200" role="alert">
+          <div
+            className="flex items-start gap-2 rounded-md border border-negative/25 bg-negative-soft px-3 py-2.5 text-13 text-negative"
+            role="alert"
+          >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
@@ -71,7 +76,7 @@ export function LoginPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="student@example.com"
+            placeholder="alexey.smirnov@example.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             icon={<Mail className="h-4 w-4" aria-hidden="true" />}
@@ -84,7 +89,7 @@ export function LoginPage() {
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
-            placeholder="Минимум 6 символов"
+            placeholder="Введите пароль"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             icon={<Lock className="h-4 w-4" aria-hidden="true" />}
@@ -93,16 +98,26 @@ export function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-surface-2 hover:text-fg"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
               </button>
             }
             required
           />
         </Field>
 
-        <Button type="submit" fullWidth size="lg" loading={submitting} leftIcon={<LogIn className="h-4 w-4" aria-hidden="true" />}>
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
+          loading={submitting}
+          leftIcon={<LogIn className="h-4 w-4" aria-hidden="true" />}
+        >
           Войти
         </Button>
       </form>

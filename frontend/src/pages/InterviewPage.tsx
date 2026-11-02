@@ -1,18 +1,14 @@
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowRight,
   Check,
-  CheckCircle2,
   Clock,
   Copy,
   Lightbulb,
-  ListChecks,
   Mic,
   MicOff,
+  Plus,
   RefreshCw,
-  Sparkles,
-  StopCircle,
 } from 'lucide-react'
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -21,10 +17,9 @@ import { EvaluationPanel } from '@/components/EvaluationPanel'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
-import { Modal } from '@/components/ui/Modal'
-import { ProgressBar } from '@/components/ui/ProgressBar'
-import { Skeleton } from '@/components/ui/Skeleton'
 import { Textarea } from '@/components/ui/Field'
+import { Modal } from '@/components/ui/Modal'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/context/ToastContext'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { ApiError, api } from '@/lib/api'
@@ -109,7 +104,6 @@ export function InterviewPage() {
   const answeredCount = Object.keys(answers).length
   const questionsTotal = session?.questions.length ?? 0
   const hasNext = currentIndex < questionsTotal - 1
-  const isLast = questionsTotal > 0 && currentIndex === questionsTotal - 1
 
   // Таймер идёт только на вопросе, который ещё не отправлен (или редактируется).
   useEffect(() => {
@@ -222,7 +216,7 @@ export function InterviewPage() {
       setAnswerText('')
       setEditing(false)
       setElapsed(0)
-      toast.success('Добавлен дополнительный вопрос — он учитывает слабые темы')
+      toast.success('Добавлен дополнительный вопрос')
     } catch (caught) {
       toast.error(
         caught instanceof ApiError ? caught.detail : 'Не удалось добавить вопрос. Попробуйте ещё раз.',
@@ -251,18 +245,18 @@ export function InterviewPage() {
 
   if (loading) {
     return (
-      <div>
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <Skeleton className="h-9 w-40" />
-          <Skeleton className="h-9 w-32" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-10 w-32" />
         </div>
-        <Skeleton className="mb-5 h-2 w-full rounded-full" />
-        <div className="grid gap-5 lg:grid-cols-3">
-          <div className="space-y-5 lg:col-span-2">
-            <Skeleton className="h-56 w-full rounded-2xl" />
-            <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-1.5 w-full rounded-full" />
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 space-y-4 xl:col-span-8">
+            <Skeleton className="h-52 w-full rounded-lg" />
+            <Skeleton className="h-72 w-full rounded-lg" />
           </div>
-          <Skeleton className="h-72 w-full rounded-2xl" />
+          <Skeleton className="col-span-12 h-72 rounded-lg xl:col-span-4" />
         </div>
       </div>
     )
@@ -270,20 +264,20 @@ export function InterviewPage() {
 
   if (error || !session) {
     return (
-      <Card className="border-rose-500/25 bg-rose-500/[0.04]">
+      <Card className="border-negative/25 p-4">
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-2.5">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" aria-hidden="true" />
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-negative" aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-rose-100">Не удалось открыть собеседование</p>
-              <p className="mt-0.5 text-xs text-rose-200/70">{error ?? 'Попробуйте вернуться к списку сессий.'}</p>
+              <p className="text-14 font-medium text-fg">Не удалось открыть собеседование</p>
+              <p className="mt-0.5 text-13 text-fg-2">{error ?? 'Попробуйте вернуться к истории сессий.'}</p>
             </div>
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" onClick={() => navigate('/history')}>
               К истории
             </Button>
-            <Button size="sm" onClick={() => void load()} leftIcon={<RefreshCw className="h-4 w-4" />}>
+            <Button size="sm" onClick={() => void load()} leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
               Повторить
             </Button>
           </div>
@@ -297,72 +291,83 @@ export function InterviewPage() {
   }
 
   const progress = questionsTotal > 0 ? Math.round((answeredCount / questionsTotal) * 100) : 0
+  const answeredState = isAnswered && !editing
 
   return (
-    <div>
-      {/* Верхняя панель */}
+    <div className="pb-24 lg:pb-0">
+      {/* Шапка сессии */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/history')} leftIcon={<ArrowLeft className="h-4 w-4" />}>
-            История
-          </Button>
-          <Badge tone="accent">{labelOf(ROLE_SHORT_LABELS, session.role)}</Badge>
-          <Badge>{labelOf(LEVEL_LABELS, session.level)}</Badge>
-          <Badge tone="violet">{labelOf(MODE_SHORT_LABELS, session.mode)}</Badge>
+        <div className="min-w-0">
+          <h1 className="text-20 font-semibold tracking-tight text-fg">Собеседование #{session.id}</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <Badge tone="accent">{labelOf(ROLE_SHORT_LABELS, session.role)}</Badge>
+            <Badge>{labelOf(LEVEL_LABELS, session.level)}</Badge>
+            <Badge tone="neutral">{labelOf(MODE_SHORT_LABELS, session.mode)}</Badge>
+            <span className="text-13 text-fg-3">
+              Вопрос {Math.min(currentIndex + 1, questionsTotal)} из {questionsTotal}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium tabular-nums text-slate-200">
-            <Clock className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="inline-flex h-10 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-13 font-medium tabular-nums text-fg">
+            <Clock className="h-4 w-4 text-fg-3" aria-hidden="true" />
             {formatClock(elapsed)}
           </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setFinishOpen(true)}
-            leftIcon={<StopCircle className="h-4 w-4" />}
-          >
+          <Button variant="secondary" onClick={() => setFinishOpen(true)}>
             Завершить
           </Button>
         </div>
       </div>
 
-      <div className="mb-5 space-y-1.5">
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>
-            Вопрос {Math.min(currentIndex + 1, questionsTotal)} из {questionsTotal}
-          </span>
+      {/* Прогресс по вопросам */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between text-12 text-fg-3">
           <span>
             Отвечено {answeredCount} из {questionsTotal}
           </span>
+          <span className="tabular-nums">{progress}%</span>
         </div>
-        <ProgressBar value={progress} tone={progress >= 100 ? 'emerald' : 'accent'} size="sm" />
+        <div className="mt-1.5 flex gap-1" aria-hidden="true">
+          {session.questions.map((question, index) => (
+            <span
+              key={question.id}
+              className={cn(
+                'h-1 flex-1 rounded-full transition-colors',
+                answers[question.id]
+                  ? 'bg-positive'
+                  : index === currentIndex
+                    ? 'bg-accent'
+                    : 'bg-line',
+              )}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
-          {/* Карточка вопроса */}
-          <Card>
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 space-y-4 xl:col-span-8">
+          {/* Вопрос */}
+          <Card className="p-5">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge tone="accent">Вопрос {currentIndex + 1}</Badge>
-              <Badge tone="info">{labelOf(QUESTION_TYPE_LABELS, currentQuestion?.type)}</Badge>
+              <Badge>{labelOf(QUESTION_TYPE_LABELS, currentQuestion?.type)}</Badge>
               {currentQuestion?.topic ? <Badge>{currentQuestion.topic}</Badge> : null}
               <Badge className={difficultyClasses(currentQuestion?.difficulty)}>
                 {labelOf(DIFFICULTY_LABELS, currentQuestion?.difficulty)}
               </Badge>
-              {isAnswered && !editing ? <Badge tone="success">Отвечено</Badge> : null}
+              {answeredState ? <Badge tone="positive">Отвечено</Badge> : null}
             </div>
-            <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-100 sm:text-lg">
-              {currentQuestion?.text}
-            </p>
+
+            <p className="whitespace-pre-wrap text-16 leading-relaxed text-fg">{currentQuestion?.text}</p>
 
             {currentQuestion?.starter_code ? (
-              <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-ink-950/70">
-                <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-500">
+              <div className="mt-4 overflow-hidden rounded-md border border-line">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-3 py-1.5">
+                  <span className="text-12 text-fg-3">
                     Шаблон кода{currentQuestion.language ? ` · ${currentQuestion.language}` : ''}
                   </span>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => void handleCopyStarter()} leftIcon={<Copy className="h-3.5 w-3.5" />}>
+                    <Button variant="ghost" size="sm" onClick={() => void handleCopyStarter()} leftIcon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}>
                       {copied ? 'Скопировано' : 'Копировать'}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={handleUseStarter}>
@@ -370,39 +375,52 @@ export function InterviewPage() {
                     </Button>
                   </div>
                 </div>
-                <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed text-slate-200">
+                <pre className="overflow-x-auto bg-surface p-3 font-mono text-13 leading-relaxed text-fg">
                   <code>{currentQuestion.starter_code}</code>
                 </pre>
               </div>
             ) : null}
           </Card>
 
-          {/* Ответ или оценка */}
-          <Card>
+          {/* Ответ / оценка */}
+          <Card className="p-5">
             <CardHeader
-              title={isAnswered && !editing ? 'Ваш ответ и оценка ИИ' : 'Ваш ответ'}
+              title={answeredState ? 'Ваш ответ и оценка ИИ' : 'Ваш ответ'}
               description={
-                isAnswered && !editing
+                answeredState
                   ? `Время на ответ: ${formatClock(currentAnswer?.answer.time_spent_sec ?? 0)}`
-                  : 'Отвечайте структурированно: определение → механика → пример → ограничения'
+                  : 'Структура: определение → механика → пример → ограничения'
               }
-              icon={<ListChecks className="h-4 w-4" />}
               action={
-                isAnswered && !editing ? (
-                  <Button variant="secondary" size="sm" onClick={handleStartEdit} leftIcon={<RefreshCw className="h-3.5 w-3.5" />}>
-                    Изменить ответ
+                answeredState ? (
+                  <Button variant="secondary" size="sm" onClick={handleStartEdit} leftIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}>
+                    Изменить
                   </Button>
                 ) : null
               }
             />
 
-            {isAnswered && !editing && currentAnswer ? (
+            {answeredState && currentAnswer ? (
               <>
-                <blockquote className="whitespace-pre-wrap rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-relaxed text-slate-300">
+                <blockquote className="whitespace-pre-wrap rounded-md border border-line bg-surface-2 p-3.5 text-13 leading-relaxed text-fg-2">
                   {currentAnswer.answer.text}
                 </blockquote>
-                <div className="mt-5 border-t border-white/5 pt-5">
+                <div className="mt-4 border-t border-line pt-4">
                   <EvaluationPanel evaluation={currentAnswer.evaluation} />
+                </div>
+                <div className="mt-4 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <Button variant="ghost" onClick={() => setFinishOpen(true)}>
+                    Завершить собеседование
+                  </Button>
+                  {hasNext ? (
+                    <Button onClick={() => goTo(currentIndex + 1)} rightIcon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}>
+                      Следующий вопрос
+                    </Button>
+                  ) : (
+                    <Button onClick={() => setFinishOpen(true)} rightIcon={<Check className="h-4 w-4" aria-hidden="true" />}>
+                      Завершить и получить отчёт
+                    </Button>
+                  )}
                 </div>
               </>
             ) : (
@@ -412,164 +430,156 @@ export function InterviewPage() {
                   onChange={(event) => setAnswerText(event.target.value)}
                   onKeyDown={handleTextareaKeyDown}
                   placeholder="Введите развёрнутый ответ. Можно надиктовать голосом — текст появится в поле."
-                  className="!min-h-44"
+                  className="!min-h-[180px]"
                   aria-label="Текст ответа"
                 />
 
                 {speech.interim ? (
-                  <p className="rounded-lg border border-accent-400/20 bg-accent-500/[0.06] px-3 py-2 text-xs italic text-accent-200">
+                  <p className="rounded-md border border-line bg-surface-2 px-3 py-2 text-12 text-fg-2">
                     Распознаётся: {speech.interim}
                   </p>
                 ) : null}
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant={speech.listening ? 'danger' : 'secondary'}
                       size="sm"
                       onClick={speech.toggle}
                       disabled={!speech.supported}
-                      leftIcon={
-                        speech.listening ? (
-                          <span className="relative flex h-4 w-4 items-center justify-center">
-                            <span className="absolute inline-flex h-3 w-3 animate-ping rounded-full bg-rose-400 opacity-70" />
-                            <MicOff className="relative h-4 w-4" />
-                          </span>
-                        ) : (
-                          <Mic className="h-4 w-4" />
-                        )
-                      }
+                      leftIcon={speech.listening ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
                     >
                       {speech.listening ? 'Остановить запись' : 'Надиктовать'}
                     </Button>
-                    <span className="text-xs text-slate-600">
+                    <span className="text-12 text-fg-3">
                       {speech.supported
-                        ? 'Web Speech API · русский язык'
+                        ? 'Русский язык, Web Speech API'
                         : 'Браузер не поддерживает распознавание речи — введите ответ текстом'}
                     </span>
                   </div>
-                  <span className="text-xs tabular-nums text-slate-600">{answerText.trim().length} симв.</span>
+                  <span className="text-12 tabular-nums text-fg-3">{answerText.trim().length} символов</span>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-slate-600">Ctrl+Enter — отправить ответ</p>
-                  <Button onClick={() => void handleSubmitAnswer()} loading={submitting} rightIcon={<Check className="h-4 w-4" />}>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-12 text-fg-3">Ctrl+Enter — отправить ответ</p>
+                  <Button onClick={() => void handleSubmitAnswer()} loading={submitting} rightIcon={<Check className="h-4 w-4" aria-hidden="true" />}>
                     {isAnswered ? 'Сохранить и переоценить' : 'Ответить'}
                   </Button>
                 </div>
               </div>
             )}
-
-            {isAnswered && !editing ? (
-              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-                <Button variant="ghost" onClick={() => setFinishOpen(true)}>
-                  Завершить собеседование
-                </Button>
-                {hasNext ? (
-                  <Button onClick={() => goTo(currentIndex + 1)} rightIcon={<ArrowRight className="h-4 w-4" />}>
-                    Следующий вопрос
-                  </Button>
-                ) : (
-                  <Button onClick={() => setFinishOpen(true)} rightIcon={<Check className="h-4 w-4" />}>
-                    Завершить и получить отчёт
-                  </Button>
-                )}
-              </div>
-            ) : isLast ? (
-              <p className="mt-3 text-xs text-slate-600">
-                Это последний вопрос. После ответа можно завершить собеседование или добавить дополнительный вопрос.
-              </p>
-            ) : null}
           </Card>
         </div>
 
-        {/* Навигатор по вопросам */}
-        <aside className="space-y-5">
-          <Card className="lg:sticky lg:top-6">
-            <CardHeader
-              title="Вопросы"
-              description={`Отвечено ${answeredCount} из ${questionsTotal}`}
-              icon={<ListChecks className="h-4 w-4" />}
-            />
-            <div className="space-y-1.5">
+        {/* Навигатор и подсказки */}
+        <aside className="col-span-12 space-y-4 xl:col-span-4">
+          <Card className="p-4 xl:sticky xl:top-[72px]">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-14 font-semibold text-fg">Вопросы</h2>
+              <span className="text-12 tabular-nums text-fg-3">
+                {answeredCount}/{questionsTotal}
+              </span>
+            </div>
+            <ol className="mt-3 space-y-1">
               {session.questions.map((question, index) => {
                 const answered = Boolean(answers[question.id])
                 const active = index === currentIndex
                 return (
-                  <button
-                    key={question.id}
-                    type="button"
-                    onClick={() => goTo(index)}
-                    aria-current={active ? 'step' : undefined}
-                    className={cn(
-                      'flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition',
-                      active
-                        ? 'border-accent-400/50 bg-accent-500/10'
-                        : 'border-transparent bg-white/[0.02] hover:bg-white/[0.05]',
-                    )}
-                  >
-                    <span
+                  <li key={question.id}>
+                    <button
+                      type="button"
+                      onClick={() => goTo(index)}
+                      aria-current={active ? 'step' : undefined}
                       className={cn(
-                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold',
-                        answered
-                          ? 'bg-emerald-500/20 text-emerald-300'
-                          : active
-                            ? 'bg-accent-500/20 text-accent-200'
-                            : 'bg-white/5 text-slate-500',
+                        'flex min-h-10 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
+                        active ? 'bg-accent-soft' : 'hover:bg-surface-2',
                       )}
                     >
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs text-slate-300">{question.topic}</span>
-                      <span className="block text-[10px] uppercase tracking-wider text-slate-600">
-                        {labelOf(QUESTION_TYPE_LABELS, question.type)}
+                      <span
+                        className={cn(
+                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-12 font-medium',
+                          answered
+                            ? 'border-positive/30 bg-positive-soft text-positive'
+                            : active
+                              ? 'border-accent/30 bg-accent-soft text-accent'
+                              : 'border-line bg-surface-2 text-fg-3',
+                        )}
+                      >
+                        {answered ? <Check className="h-3 w-3" aria-hidden="true" /> : index + 1}
                       </span>
-                    </span>
-                    {answered ? (
-                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-emerald-300">
-                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        {formatScore(answers[question.id]?.evaluation.score)}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-13 text-fg">{question.topic}</span>
+                        <span className="block text-12 text-fg-3">{labelOf(QUESTION_TYPE_LABELS, question.type)}</span>
                       </span>
-                    ) : (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-600" aria-hidden="true" />
-                    )}
-                  </button>
+                      {answered ? (
+                        <span className="shrink-0 text-12 font-medium tabular-nums text-fg-2">
+                          {formatScore(answers[question.id]?.evaluation.score)}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
                 )
               })}
-            </div>
+            </ol>
 
             <Button
-              variant="soft"
+              variant="secondary"
               fullWidth
-              className="mt-4"
+              className="mt-3"
               loading={addingQuestion}
               onClick={() => void handleAddAdaptiveQuestion()}
-              leftIcon={<Sparkles className="h-4 w-4" />}
+              leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
             >
-              Доп. вопрос ИИ
+              Добавить вопрос
             </Button>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
-              Адаптивный вопрос строится по вашим слабым местам и не входит в исходный план.
+            <p className="mt-1.5 text-12 leading-relaxed text-fg-3">
+              Адаптивный вопрос учитывает ваши слабые темы и не входит в исходный план.
             </p>
           </Card>
 
-          <Card>
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <Lightbulb className="h-3.5 w-3.5 text-amber-300" aria-hidden="true" />
+          <Card className="p-4">
+            <p className="flex items-center gap-1.5 text-12 font-semibold uppercase tracking-wide text-fg-2">
+              <Lightbulb className="h-3.5 w-3.5 text-caution" aria-hidden="true" />
               Как отвечать
             </p>
-            <ul className="space-y-2 text-xs leading-relaxed text-slate-500">
+            <ul className="mt-2 space-y-2 text-13 leading-relaxed text-fg-2">
               <li>Начните с короткого определения — это база оценки.</li>
               <li>Добавьте механику «как это работает» и пример из практики.</li>
               <li>Упомяните ограничения и типичные ошибки — это глубина.</li>
-              <li>Следите за структурой: тезис → пояснение → вывод.</li>
+              <li>Держите структуру: тезис → пояснение → вывод.</li>
             </ul>
           </Card>
         </aside>
       </div>
 
-      {/* Завершение */}
+      {/* Sticky-действие на мобильном */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface p-3 lg:hidden">
+        <div className="mx-auto flex max-w-container items-center gap-2">
+          <Button
+            fullWidth
+            size="lg"
+            loading={answeredState ? false : submitting}
+            disabled={answeredState ? false : !answerText.trim()}
+            onClick={() => {
+              if (answeredState) {
+                if (hasNext) goTo(currentIndex + 1)
+                else setFinishOpen(true)
+              } else {
+                void handleSubmitAnswer()
+              }
+            }}
+          >
+            {answeredState
+              ? hasNext
+                ? 'Следующий вопрос'
+                : 'Завершить и получить отчёт'
+              : isAnswered
+                ? 'Сохранить и переоценить'
+                : 'Ответить'}
+          </Button>
+        </div>
+      </div>
+
       <Modal
         open={finishOpen}
         onClose={() => setFinishOpen(false)}
@@ -584,7 +594,7 @@ export function InterviewPage() {
               onClick={() => void handleFinish()}
               loading={finishing}
               disabled={answeredCount === 0}
-              leftIcon={<Check className="h-4 w-4" />}
+              leftIcon={<Check className="h-4 w-4" aria-hidden="true" />}
             >
               Завершить
             </Button>
@@ -592,23 +602,23 @@ export function InterviewPage() {
         }
       >
         {answeredCount === 0 ? (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-3 text-sm text-amber-100">
+          <div className="flex items-start gap-2 rounded-md border border-caution/25 bg-caution-soft px-3 py-2.5 text-13 text-caution">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>Чтобы сформировать отчёт, ответьте хотя бы на один вопрос.</span>
           </div>
         ) : (
-          <div className="space-y-2 text-sm text-slate-300">
+          <div className="space-y-2 text-13 text-fg-2">
             <p>
-              Отвечено <span className="font-semibold text-slate-100">{answeredCount}</span> из{' '}
-              <span className="font-semibold text-slate-100">{questionsTotal}</span> вопросов.
+              Отвечено <span className="font-semibold text-fg">{answeredCount}</span> из{' '}
+              <span className="font-semibold text-fg">{questionsTotal}</span> вопросов.
             </p>
             {answeredCount < questionsTotal ? (
-              <p className="text-xs text-slate-500">
-                Оставшиеся {questionsTotal - answeredCount} вопрос(ов) не попадут в отчёт. Вернуться к ним после
-                завершения будет нельзя.
+              <p className="text-12 leading-relaxed text-fg-3">
+                Оставшиеся {questionsTotal - answeredCount} вопрос(ов) не попадут в отчёт. После завершения
+                вернуться к ним будет нельзя.
               </p>
             ) : (
-              <p className="text-xs text-emerald-300">Все вопросы отвечены — отличная работа!</p>
+              <p className="text-12 text-positive">Все вопросы отвечены.</p>
             )}
           </div>
         )}

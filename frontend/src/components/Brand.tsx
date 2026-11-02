@@ -1,19 +1,28 @@
-import { Sparkles } from 'lucide-react'
+import { GraduationCap } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { cn } from '@/lib/cn'
 
-/** Логотип-ссылка на дашборд. */
-export function Brand({ to = '/', className }: { to?: string; className?: string }) {
+interface BrandProps {
+  to?: string
+  className?: string
+  /** Только знак, без подписи (для свёрнутого сайдбара). */
+  iconOnly?: boolean
+}
+
+/** Логотип-ссылка: знак на акцентной плашке + название продукта. */
+export function Brand({ to = '/', className, iconOnly = false }: BrandProps) {
   return (
-    <Link to={to} className={cn('flex items-center gap-3', className)}>
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-violet-500 shadow-lg shadow-accent-700/30">
-        <Sparkles className="h-5 w-5 text-white" aria-hidden="true" />
+    <Link to={to} className={cn('flex items-center gap-2.5', className)} aria-label="Тренажёр собеседований — на дашборд">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-fg">
+        <GraduationCap className="h-[18px] w-[18px]" aria-hidden="true" />
       </span>
-      <span className="leading-tight">
-        <span className="block text-sm font-semibold text-slate-50">Тренажёр</span>
-        <span className="block text-[11px] uppercase tracking-wider text-slate-500">собеседований</span>
-      </span>
+      {iconOnly ? null : (
+        <span className="leading-tight">
+          <span className="block text-14 font-semibold text-fg">Тренажёр</span>
+          <span className="block text-12 text-fg-3">Собеседования</span>
+        </span>
+      )}
     </Link>
   )
 }

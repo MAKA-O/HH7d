@@ -1,12 +1,4 @@
-import {
-  AlertCircle,
-  BrainCircuit,
-  Mail,
-  RefreshCw,
-  Save,
-  ShieldCheck,
-  UserRound,
-} from 'lucide-react'
+import { AlertCircle, BrainCircuit, RefreshCw, Save } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 import { PageHeader } from '@/components/PageHeader'
@@ -15,19 +7,18 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { Skeleton, SkeletonText } from '@/components/ui/Skeleton'
+import { useAiStatus } from '@/context/AiStatusContext'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { ApiError, api } from '@/lib/api'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { LEVEL_LABELS, ROLE_LABELS, labelOf } from '@/lib/labels'
-import type { AIHealthOut, MetaOut, UserOut } from '@/lib/types'
-
-/** Ответ профиля может содержать resume_text (поле есть в ProfileIn, в UserOut — по контракту нет). */
-type ProfileResponse = UserOut & { resume_text?: string }
+import type { MetaOut } from '@/lib/types'
 
 export function ProfilePage() {
   const { user, setUser } = useAuth()
   const toast = useToast()
+  const { health, latencyMs, loading: aiLoading, error: aiError, checkedAt, refresh: refreshAi } = useAiStatus()
 
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState('backend')
@@ -39,18 +30,11 @@ export function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const [aiHealth, setAiHealth] = useState<AIHealthOut | null>(null)
-  const [aiLoading, setAiLoading] = useState(true)
-  const [aiError, setAiError] = useState<string | null>(null)
-
   const loadProfile = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [profile, metaData] = await Promise.all([
-        api.profile.get() as Promise<ProfileResponse>,
-        api.meta(),
-      ])
+      const [profile, metaData] = await Promise.all([api.profile.get(), api.meta()])
       setFullName(profile.full_name ?? '')
       setRole(profile.target_role ?? 'backend')
       setLevel(profile.target_level ?? 'junior')
@@ -63,22 +47,9 @@ export function ProfilePage() {
     }
   }, [])
 
-  const loadAiHealth = useCallback(async () => {
-    setAiLoading(true)
-    setAiError(null)
-    try {
-      setAiHealth(await api.aiHealth())
-    } catch (caught) {
-      setAiError(caught instanceof Error && caught.message ? caught.message : 'Не удалось получить состояние ИИ.')
-    } finally {
-      setAiLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     void loadProfile()
-    void loadAiHealth()
-  }, [loadProfile, loadAiHealth])
+  }, [loadProfile])
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -107,58 +78,54 @@ export function ProfilePage() {
     }
   }
 
+  const aiTone = aiError ? 'bg-negative' : health?.mode === 'live' ? 'bg-positive' : health ? 'bg-caution' : 'bg-fg-3'
+
   return (
     <div>
       <PageHeader
-        eyebrow="Профиль"
-        title="Настройки и состояние ИИ"
-        description="Данные профиля используются для персонализации вопросов и задач с кодом."
+        title="Профиль"
+        description="Данные используются для персональных вопросов, задач и рекомендаций."
       />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        {/* Форма профиля */}
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 xl:col-span-8">
           {loading ? (
-            <Card>
+            <Card className="p-5">
               <SkeletonText lines={2} />
               <div className="mt-5 space-y-4">
-                <Skeleton className="h-11 w-full rounded-xl" />
-                <Skeleton className="h-11 w-full rounded-xl" />
-                <Skeleton className="h-11 w-full rounded-xl" />
-                <Skeleton className="h-32 w-full rounded-xl" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-32 w-full rounded-md" />
               </div>
             </Card>
           ) : error ? (
-            <Card className="border-rose-500/25 bg-rose-500/[0.04]">
+            <Card className="border-negative/25 p-4">
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-2.5">
-                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" aria-hidden="true" />
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-negative" aria-hidden="true" />
                   <div>
-                    <p className="text-sm font-medium text-rose-100">Не удалось загрузить профиль</p>
-                    <p className="mt-0.5 text-xs text-rose-200/70">{error}</p>
+                    <p className="text-14 font-medium text-fg">Не удалось загрузить профиль</p>
+                    <p className="mt-0.5 text-13 text-fg-2">{error}</p>
                   </div>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => void loadProfile()} leftIcon={<RefreshCw className="h-4 w-4" />}>
+                <Button variant="secondary" size="sm" onClick={() => void loadProfile()} leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
                   Повторить
                 </Button>
               </div>
             </Card>
           ) : (
-            <Card>
-              <CardHeader
-                title="Личные данные"
-                description="Имя и цели подготовки"
-                icon={<UserRound className="h-4 w-4" />}
-              />
+            <Card className="p-5">
+              <CardHeader title="Личные данные" description="Имя и цель подготовки" />
               <form onSubmit={handleSave} className="space-y-4">
                 <Field label="Имя" htmlFor="profile_name" required>
                   <Input
                     id="profile_name"
                     value={fullName}
                     onChange={(event) => setFullName(event.target.value)}
-                    placeholder="Иван Петров"
+                    placeholder="Алексей Смирнов"
                     maxLength={255}
-                    icon={<UserRound className="h-4 w-4" aria-hidden="true" />}
+                    autoComplete="name"
                   />
                 </Field>
 
@@ -188,7 +155,7 @@ export function ProfilePage() {
                 <Field
                   label="Резюме"
                   htmlFor="profile_resume"
-                  hint="Коротко о вашем опыте: ИИ учитывает это при генерации вопросов и задач."
+                  hint="Коротко об опыте: ИИ учитывает это при генерации вопросов и задач."
                 >
                   <Textarea
                     id="profile_resume"
@@ -199,8 +166,8 @@ export function ProfilePage() {
                   />
                 </Field>
 
-                <div className="flex justify-end">
-                  <Button type="submit" loading={saving} leftIcon={<Save className="h-4 w-4" />}>
+                <div className="flex justify-end border-t border-line pt-4">
+                  <Button type="submit" loading={saving} leftIcon={<Save className="h-4 w-4" aria-hidden="true" />}>
                     Сохранить изменения
                   </Button>
                 </div>
@@ -209,21 +176,20 @@ export function ProfilePage() {
           )}
         </div>
 
-        {/* Аккаунт и ИИ */}
-        <div className="space-y-5">
-          <Card>
-            <CardHeader title="Аккаунт" description="Учётные данные" icon={<Mail className="h-4 w-4" />} />
-            <dl className="space-y-3 text-sm">
+        <div className="col-span-12 space-y-4 xl:col-span-4">
+          <Card className="p-5">
+            <CardHeader title="Аккаунт" description="Учётные данные" />
+            <dl className="space-y-3 text-13">
               <div>
-                <dt className="text-xs uppercase tracking-wider text-slate-500">Email</dt>
-                <dd className="mt-0.5 break-all text-slate-200">{user?.email ?? '—'}</dd>
+                <dt className="text-12 text-fg-3">Email</dt>
+                <dd className="mt-0.5 break-all text-fg">{user?.email ?? '—'}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wider text-slate-500">Дата регистрации</dt>
-                <dd className="mt-0.5 text-slate-200">{user ? formatDate(user.created_at) : '—'}</dd>
+                <dt className="text-12 text-fg-3">Дата регистрации</dt>
+                <dd className="mt-0.5 text-fg">{user ? formatDate(user.created_at) : '—'}</dd>
               </div>
               <div>
-                <dt className="mb-1 text-xs uppercase tracking-wider text-slate-500">Цель</dt>
+                <dt className="mb-1 text-12 text-fg-3">Цель подготовки</dt>
                 <dd className="flex flex-wrap gap-2">
                   <Badge tone="accent">{labelOf(ROLE_LABELS, user?.target_role)}</Badge>
                   <Badge>{labelOf(LEVEL_LABELS, user?.target_level)}</Badge>
@@ -232,64 +198,78 @@ export function ProfilePage() {
             </dl>
           </Card>
 
-          <Card>
-            <CardHeader
-              title="Состояние ИИ"
-              description="Движок, который оценивает ответы"
-              icon={<BrainCircuit className="h-4 w-4" />}
-              action={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void loadAiHealth()}
-                  loading={aiLoading}
-                  aria-label="Обновить состояние ИИ"
-                  leftIcon={aiLoading ? undefined : <RefreshCw className="h-3.5 w-3.5" />}
-                >
-                  Обновить
-                </Button>
-              }
-            />
+          <Card className="p-5">
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div>
+                <h2 className="flex items-center gap-2 text-14 font-semibold text-fg">
+                  <BrainCircuit className="h-4 w-4 text-fg-3" aria-hidden="true" />
+                  Состояние ИИ
+                </h2>
+                <p className="mt-0.5 text-13 text-fg-2">Движок, который оценивает ответы</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void refreshAi()}
+                loading={aiLoading}
+                aria-label="Обновить состояние ИИ"
+                leftIcon={aiLoading ? undefined : <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+              >
+                Обновить
+              </Button>
+            </div>
 
-            {aiLoading ? (
+            {aiLoading && !health ? (
               <div className="space-y-2">
                 <Skeleton className="h-5 w-24" />
-                <Skeleton className="h-3.5 w-full" />
-                <Skeleton className="h-3.5 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-2/3" />
               </div>
             ) : aiError ? (
-              <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3.5 text-xs leading-relaxed text-rose-200">
+              <div className="rounded-md border border-negative/25 bg-negative-soft p-3 text-13 leading-relaxed text-negative">
                 {aiError}
               </div>
-            ) : aiHealth ? (
+            ) : health ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={aiHealth.mode === 'live' ? 'success' : 'warning'} icon={<ShieldCheck className="h-3 w-3" />}>
-                    {aiHealth.mode === 'live' ? 'live' : 'offline'}
+                  <span className={`h-1.5 w-1.5 rounded-full ${aiTone}`} aria-hidden="true" />
+                  <Badge tone={health.mode === 'live' ? 'positive' : 'caution'}>
+                    {health.mode === 'live' ? 'live' : 'offline'}
                   </Badge>
-                  <Badge tone={aiHealth.available ? 'success' : 'danger'}>
-                    {aiHealth.available ? 'доступен' : 'недоступен'}
+                  <Badge tone={health.available ? 'positive' : 'negative'}>
+                    {health.available ? 'доступен' : 'недоступен'}
                   </Badge>
                 </div>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-slate-500">Провайдер</dt>
-                    <dd className="truncate text-right text-slate-200">{aiHealth.provider || '—'}</dd>
+
+                <dl className="divide-y divide-line text-13">
+                  <div className="flex items-baseline justify-between gap-3 py-2">
+                    <dt className="text-fg-2">Провайдер</dt>
+                    <dd className="truncate text-right text-fg">{health.provider || '—'}</dd>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-slate-500">Модель</dt>
-                    <dd className="truncate text-right text-slate-200">{aiHealth.model || '—'}</dd>
+                  <div className="flex items-baseline justify-between gap-3 py-2">
+                    <dt className="text-fg-2">Модель</dt>
+                    <dd className="truncate text-right text-fg">{health.model || '—'}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 py-2">
+                    <dt className="text-fg-2">Задержка ответа</dt>
+                    <dd className="tabular-nums text-fg">{latencyMs != null ? `${latencyMs} мс` : '—'}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 py-2">
+                    <dt className="text-fg-2">Проверено</dt>
+                    <dd className="text-right text-fg">{checkedAt ? formatDateTime(new Date(checkedAt).toISOString()) : '—'}</dd>
                   </div>
                 </dl>
-                {aiHealth.message ? (
-                  <p className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs leading-relaxed text-slate-400">
-                    {aiHealth.message}
+
+                {health.message ? (
+                  <p className="rounded-md border border-line bg-surface-2 p-3 text-12 leading-relaxed text-fg-2">
+                    {health.message}
                   </p>
                 ) : null}
-                {aiHealth.mode === 'offline' ? (
-                  <p className="text-[11px] leading-relaxed text-slate-500">
-                    Офлайн-режим: вопросы берутся из встроенного банка, оценки считаются эвристиками. Весь
-                    функционал доступен без ключа API.
+
+                {health.mode === 'offline' ? (
+                  <p className="text-12 leading-relaxed text-fg-3">
+                    Офлайн-режим: вопросы берутся из встроенного банка, оценки считаются эвристиками. Функциональность
+                    полная, внешний ключ API не требуется.
                   </p>
                 ) : null}
               </div>
@@ -298,8 +278,9 @@ export function ProfilePage() {
 
           {user ? (
             <Card className="p-4">
-              <p className="text-xs leading-relaxed text-slate-500">
-                Профиль создан {formatDateTime(user.created_at)}. Изменения применяются к новым сессиям и задачам.
+              <p className="text-12 leading-relaxed text-fg-3">
+                Аккаунт создан {formatDateTime(user.created_at)}. Изменения профиля применяются к новым сессиям и
+                задачам.
               </p>
             </Card>
           ) : null}

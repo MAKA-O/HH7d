@@ -14,6 +14,8 @@ export interface UserOut {
   full_name: string
   target_role: string
   target_level: string
+  /** Резюме из профиля; API может вернуть null, если оно не заполнено. */
+  resume_text: string | null
   created_at: string
 }
 

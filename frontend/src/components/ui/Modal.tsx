@@ -13,7 +13,7 @@ interface ModalProps {
   className?: string
 }
 
-/** Простое модальное окно с затемнением и закрытием по Escape. */
+/** Модальное окно: затемнение без blur, панель-карточка, закрытие по Escape. */
 export function Modal({ open, onClose, title, description, children, footer, className }: ModalProps) {
   useEffect(() => {
     if (!open) return
@@ -32,29 +32,25 @@ export function Modal({ open, onClose, title, description, children, footer, cla
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[90] flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <button
         type="button"
         aria-label="Закрыть окно"
-        className="absolute inset-0 cursor-default bg-ink-950/80 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 cursor-default bg-black/40"
         onClick={onClose}
+        tabIndex={-1}
       />
-      <div
-        className={cn(
-          'relative w-full max-w-md animate-fade-up rounded-2xl border border-white/10 bg-ink-800 p-5 shadow-2xl sm:p-6',
-          className,
-        )}
-      >
+      <div className={cn('relative w-full max-w-md rounded-lg border border-line bg-surface p-5 shadow-pop', className)}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-50">{title}</h2>
-            {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
+            <h2 className="text-16 font-semibold text-fg">{title}</h2>
+            {description ? <p className="mt-1 text-13 leading-relaxed text-fg-2">{description}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Закрыть"
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

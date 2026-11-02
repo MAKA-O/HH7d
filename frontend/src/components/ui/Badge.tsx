@@ -2,16 +2,14 @@ import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
 
-type BadgeTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | 'violet'
+export type BadgeTone = 'neutral' | 'accent' | 'positive' | 'caution' | 'negative'
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
-  neutral: 'border-white/10 bg-white/5 text-slate-300',
-  accent: 'border-accent-400/25 bg-accent-500/10 text-accent-200',
-  success: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300',
-  warning: 'border-amber-500/25 bg-amber-500/10 text-amber-300',
-  danger: 'border-rose-500/25 bg-rose-500/10 text-rose-300',
-  info: 'border-sky-500/25 bg-sky-500/10 text-sky-300',
-  violet: 'border-violet-500/25 bg-violet-500/10 text-violet-300',
+  neutral: 'border-line bg-surface-2 text-fg-2',
+  accent: 'border-accent/25 bg-accent-soft text-accent',
+  positive: 'border-positive/25 bg-positive-soft text-positive',
+  caution: 'border-caution/25 bg-caution-soft text-caution',
+  negative: 'border-negative/25 bg-negative-soft text-negative',
 }
 
 interface BadgeProps {
@@ -21,12 +19,12 @@ interface BadgeProps {
   icon?: ReactNode
 }
 
-/** Небольшой цветной бейдж для статусов, сложности и типов. */
+/** Бейдж-статус: радиус 999px, 12px, семантические тона. */
 export function Badge({ children, tone = 'neutral', className, icon }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-medium leading-5',
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-12 font-medium leading-4',
         TONE_CLASSES[tone],
         className,
       )}

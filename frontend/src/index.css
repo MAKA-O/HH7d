@@ -2,9 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Дизайн-токены приложения.
+ * Светлая тема — по умолчанию, тёмная — класс .dark на <html>.
+ * Цвета заданы в RGB-каналах, чтобы работали модификаторы прозрачности Tailwind.
+ */
 @layer base {
   :root {
-    color-scheme: dark;
+    --canvas: 247 248 250;
+    --surface: 255 255 255;
+    --surface-2: 248 250 252;
+    --line: 226 232 240;
+    --line-strong: 203 213 225;
+    --fg: 15 23 42;
+    --fg-2: 71 85 105;
+    --fg-3: 100 116 139;
+    --fg-inverse: 255 255 255;
+    --accent: 37 99 235;
+    --accent-hover: 29 78 216;
+    --accent-soft: 239 246 255;
+    --accent-fg: 255 255 255;
+    --positive: 21 128 61;
+    --positive-soft: 240 253 244;
+    --caution: 180 83 9;
+    --caution-soft: 255 251 235;
+    --negative: 185 28 28;
+    --negative-soft: 254 242 242;
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-pop: 0 4px 16px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  }
+
+  .dark {
+    --canvas: 9 12 17;
+    --surface: 17 22 29;
+    --surface-2: 23 29 38;
+    --line: 38 46 57;
+    --line-strong: 55 65 81;
+    --fg: 230 233 238;
+    --fg-2: 163 174 188;
+    --fg-3: 123 135 148;
+    --fg-inverse: 15 23 42;
+    --accent: 59 130 246;
+    --accent-hover: 96 165 250;
+    --accent-soft: 18 35 61;
+    --accent-fg: 255 255 255;
+    --positive: 74 222 128;
+    --positive-soft: 15 36 24;
+    --caution: 251 191 36;
+    --caution-soft: 42 31 10;
+    --negative: 248 113 113;
+    --negative-soft: 42 18 20;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
   }
 
   html {
@@ -12,22 +61,29 @@
   }
 
   body {
-    @apply min-h-screen bg-ink-950 font-sans text-slate-200 antialiased;
-    background-image:
-      radial-gradient(60rem 60rem at 110% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
-      radial-gradient(50rem 50rem at -10% 0%, rgba(168, 85, 247, 0.12), transparent 55%),
-      radial-gradient(40rem 40rem at 50% 120%, rgba(14, 165, 233, 0.08), transparent 60%);
-    background-attachment: fixed;
+    @apply bg-canvas font-sans text-14 text-fg antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Иконки lucide: единая толщина штриха 1.75 */
+  .lucide {
+    stroke-width: 1.75;
   }
 
   ::selection {
-    @apply bg-accent-500/40 text-white;
+    @apply bg-accent/20 text-fg;
   }
 
-  /* Аккуратный скроллбар в тёмной теме */
+  /* Единый focus ring: 2px accent + offset 2px */
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -40,44 +96,60 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    @apply rounded-full border-2 border-transparent bg-slate-600/50 bg-clip-padding;
+    @apply rounded-full border-2 border-transparent bg-clip-padding;
+    background-color: rgb(var(--line-strong));
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500/60;
-  }
-
-  :focus-visible {
-    @apply outline-none ring-2 ring-accent-400/70 ring-offset-2 ring-offset-ink-950;
+    background-color: rgb(var(--fg-3));
   }
 }
 
 @layer components {
-  /* Базовая «стеклянная» карточка — используется на всех страницах */
-  .surface {
-    @apply rounded-2xl border border-white/10 bg-white/[0.03] shadow-card backdrop-blur-sm;
+  /* Поверхность-карточка: радиус 8px, бордер #e2e8f0, тень 0 1px 2px */
+  .card {
+    @apply rounded-lg border border-line bg-surface shadow-card;
   }
 
-  .surface-hover {
-    @apply transition duration-200 hover:border-white/20 hover:bg-white/[0.05];
+  /* Базовое поле ввода (общая часть для input/select/textarea) */
+  .control {
+    @apply w-full rounded-md border border-line bg-surface text-14 text-fg transition-colors duration-150 placeholder:text-fg-3;
   }
 
-  /* Мелкая типографика секций */
-  .section-title {
-    @apply text-sm font-semibold uppercase tracking-wider text-slate-400;
+  .control:hover:not(:disabled) {
+    @apply border-line-strong;
   }
 
-  /* Градиентный текст для акцентов */
-  .text-gradient {
-    @apply bg-gradient-to-r from-accent-300 via-accent-200 to-sky-300 bg-clip-text text-transparent;
+  .control:focus {
+    @apply border-accent outline-none;
+    box-shadow: 0 0 0 3px rgb(var(--accent) / 0.16);
   }
 
-  /* Фон-сетка для hero-блоков */
-  .bg-grid {
-    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 40px 40px;
-    mask-image: radial-gradient(ellipse at top, black, transparent 70%);
+  .control:disabled {
+    @apply cursor-not-allowed bg-surface-2 text-fg-3;
+  }
+
+  .control[aria-invalid='true'] {
+    @apply border-negative;
+  }
+
+  .control[aria-invalid='true']:focus {
+    box-shadow: 0 0 0 3px rgb(var(--negative) / 0.16);
+  }
+
+  /* Компактные подписи-надзаголовки */
+  .eyebrow {
+    @apply text-12 font-medium uppercase tracking-[0.06em] text-fg-3;
+  }
+
+  /* Хлебные крошки и метаданные */
+  .meta {
+    @apply text-13 text-fg-2;
+  }
+
+  /* Ссылка-действие внутри текста */
+  .text-link {
+    @apply font-medium text-accent underline-offset-2 hover:underline;
   }
 }
 
@@ -88,5 +160,19 @@
 
   .scrollbar-none::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Подсветка совпадений в поиске */
+  .search-mark {
+    @apply rounded-[2px] bg-caution-soft px-0.5 text-fg;
+  }
+
+  /* Табличная плотность: строка 44px */
+  .table-row {
+    @apply h-11 border-b border-line last:border-b-0;
+  }
+
+  .table-head {
+    @apply h-10 border-b border-line bg-surface-2 text-left text-12 font-medium uppercase tracking-[0.04em] text-fg-3;
   }
 }

@@ -3,22 +3,24 @@ import { Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/cn'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'soft'
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
+const BASE =
+  'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50'
+
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary:
-    'bg-gradient-to-r from-accent-500 to-violet-500 text-white shadow-lg shadow-accent-700/30 hover:from-accent-400 hover:to-violet-400 disabled:from-accent-500/60 disabled:to-violet-500/60',
-  secondary: 'border border-white/15 bg-white/5 text-slate-100 hover:border-white/25 hover:bg-white/10',
-  ghost: 'text-slate-300 hover:bg-white/5 hover:text-white',
-  danger: 'border border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20',
-  soft: 'border border-accent-400/25 bg-accent-500/10 text-accent-200 hover:bg-accent-500/20',
+  primary: 'bg-accent text-accent-fg hover:bg-accent-hover active:bg-accent-hover',
+  secondary: 'border border-line bg-surface text-fg hover:bg-surface-2 active:bg-surface-2',
+  outline: 'border border-line bg-transparent text-fg hover:bg-surface-2 active:bg-surface-2',
+  ghost: 'text-fg-2 hover:bg-surface-2 hover:text-fg active:bg-surface-2',
+  danger: 'border border-negative/25 bg-negative-soft text-negative hover:border-negative/40 hover:bg-negative/10',
 }
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: 'h-9 gap-1.5 rounded-lg px-3 text-sm',
-  md: 'h-11 gap-2 rounded-xl px-5 text-sm',
-  lg: 'h-12 gap-2.5 rounded-xl px-6 text-base',
+  sm: 'h-10 px-3 text-13',
+  md: 'h-10 px-4 text-14',
+  lg: 'h-11 px-5 text-14',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -30,7 +32,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean
 }
 
-/** Основная кнопка интерфейса: 5 вариантов, 3 размера, состояние загрузки. */
+/** Основная кнопка: 5 вариантов, 3 размера, высота ≥40px (цель нажатия). */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = 'primary',
@@ -52,18 +54,47 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       disabled={disabled || loading}
-      className={cn(
-        'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition duration-200 disabled:cursor-not-allowed disabled:opacity-60',
-        VARIANT_CLASSES[variant],
-        SIZE_CLASSES[size],
-        fullWidth && 'w-full',
-        className,
-      )}
+      className={cn(BASE, VARIANT_CLASSES[variant], SIZE_CLASSES[size], fullWidth && 'w-full', className)}
       {...rest}
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : leftIcon}
       {children}
       {!loading && rightIcon}
+    </button>
+  )
+})
+
+export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Доступное имя действия (обязательно, т.к. кнопка без текста). */
+  label: string
+  variant?: 'ghost' | 'secondary' | 'danger'
+}
+
+const ICON_VARIANT_CLASSES: Record<NonNullable<IconButtonProps['variant']>, string> = {
+  ghost: 'text-fg-2 hover:bg-surface-2 hover:text-fg',
+  secondary: 'border border-line bg-surface text-fg-2 hover:bg-surface-2 hover:text-fg',
+  danger: 'text-fg-3 hover:bg-negative-soft hover:text-negative',
+}
+
+/** Квадратная иконка-кнопка 40×40px. */
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { label, variant = 'ghost', className, children, type = 'button', ...rest },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type={type}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50',
+        ICON_VARIANT_CLASSES[variant],
+        className,
+      )}
+      {...rest}
+    >
+      {children}
     </button>
   )
 })

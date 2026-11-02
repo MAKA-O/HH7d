@@ -20,7 +20,8 @@ FILES = {
     "03-Сценарии.md": "03-Scenarios.docx",
     "04-ПЗ.md": "04-PZ.docx",
     "05-Тестирование.md": "05-Testing.docx",
-    "API.md": "06-API.docx",
+    "06-Дизайн-система.md": "06-Design-System.docx",
+    "API.md": "07-API.docx",
 }
 
 

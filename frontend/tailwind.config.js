@@ -1,75 +1,73 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
         sans: [
           'Inter',
-          'SF Pro Display',
+          'ui-sans-serif',
+          'system-ui',
           '-apple-system',
-          'BlinkMacSystemFont',
           'Segoe UI',
           'Roboto',
           'Helvetica Neue',
           'Arial',
           'sans-serif',
         ],
-        mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'monospace'],
+        mono: ['JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
       },
       colors: {
-        ink: {
-          950: '#05070d',
-          900: '#080c16',
-          800: '#0c1220',
-          700: '#121a2c',
+        canvas: 'rgb(var(--canvas) / <alpha-value>)',
+        surface: {
+          DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+          2: 'rgb(var(--surface-2) / <alpha-value>)',
+        },
+        line: {
+          DEFAULT: 'rgb(var(--line) / <alpha-value>)',
+          strong: 'rgb(var(--line-strong) / <alpha-value>)',
+        },
+        fg: {
+          DEFAULT: 'rgb(var(--fg) / <alpha-value>)',
+          2: 'rgb(var(--fg-2) / <alpha-value>)',
+          3: 'rgb(var(--fg-3) / <alpha-value>)',
+          inverse: 'rgb(var(--fg-inverse) / <alpha-value>)',
         },
         accent: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          hover: 'rgb(var(--accent-hover) / <alpha-value>)',
+          soft: 'rgb(var(--accent-soft) / <alpha-value>)',
+          fg: 'rgb(var(--accent-fg) / <alpha-value>)',
         },
+        positive: {
+          DEFAULT: 'rgb(var(--positive) / <alpha-value>)',
+          soft: 'rgb(var(--positive-soft) / <alpha-value>)',
+        },
+        caution: {
+          DEFAULT: 'rgb(var(--caution) / <alpha-value>)',
+          soft: 'rgb(var(--caution-soft) / <alpha-value>)',
+        },
+        negative: {
+          DEFAULT: 'rgb(var(--negative) / <alpha-value>)',
+          soft: 'rgb(var(--negative-soft) / <alpha-value>)',
+        },
+      },
+      fontSize: {
+        12: ['12px', { lineHeight: '16px' }],
+        13: ['13px', { lineHeight: '18px' }],
+        14: ['14px', { lineHeight: '20px' }],
+        16: ['16px', { lineHeight: '24px' }],
+        20: ['20px', { lineHeight: '28px' }],
+        24: ['24px', { lineHeight: '32px' }],
+        30: ['30px', { lineHeight: '36px' }],
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(129, 140, 248, 0.25), 0 20px 60px -20px rgba(79, 70, 229, 0.55)',
-        card: '0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -32px rgba(0, 0, 0, 0.9)',
+        card: 'var(--shadow-card)',
+        pop: 'var(--shadow-pop)',
       },
-      backgroundImage: {
-        'grid-fade':
-          'linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)',
-      },
-      keyframes: {
-        'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        'fade-in': {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        'pulse-soft': {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.45' },
-        },
-        'typing-bounce': {
-          '0%, 80%, 100%': { transform: 'translateY(0)', opacity: '0.5' },
-          '40%': { transform: 'translateY(-4px)', opacity: '1' },
-        },
-        'spin-slow': {
-          to: { transform: 'rotate(360deg)' },
-        },
-      },
-      animation: {
-        'fade-up': 'fade-up 0.35s ease-out both',
-        'fade-in': 'fade-in 0.25s ease-out both',
-        'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
-        'typing-bounce': 'typing-bounce 1.2s ease-in-out infinite',
-        'spin-slow': 'spin-slow 2.4s linear infinite',
+      maxWidth: {
+        container: '1200px',
       },
     },
   },

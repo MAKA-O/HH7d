@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 import { ProtectedRoute, PublicOnlyRoute } from '@/components/ProtectedRoute'
 import { AuthProvider } from '@/context/AuthContext'
+import { ThemeProvider } from '@/context/ThemeContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { ChatPage } from '@/pages/ChatPage'
 import { CodePage } from '@/pages/CodePage'
@@ -28,42 +29,44 @@ function ScrollToTop() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <ScrollToTop />
-          <Routes>
-            <Route
-              path="/login"
-              element={
-                <PublicOnlyRoute>
-                  <LoginPage />
-                </PublicOnlyRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <PublicOnlyRoute>
-                  <RegisterPage />
-                </PublicOnlyRoute>
-              }
-            />
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <ScrollToTop />
+            <Routes>
+              <Route
+                path="/login"
+                element={
+                  <PublicOnlyRoute>
+                    <LoginPage />
+                  </PublicOnlyRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <PublicOnlyRoute>
+                    <RegisterPage />
+                  </PublicOnlyRoute>
+                }
+              />
 
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/interview/new" element={<NewInterviewPage />} />
-              <Route path="/interview/:id" element={<InterviewPage />} />
-              <Route path="/interview/:id/report" element={<ReportPage />} />
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/code" element={<CodePage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Route>
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/interview/new" element={<NewInterviewPage />} />
+                <Route path="/interview/:id" element={<InterviewPage />} />
+                <Route path="/interview/:id/report" element={<ReportPage />} />
+                <Route path="/chat" element={<ChatPage />} />
+                <Route path="/code" element={<CodePage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
 
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </ToastProvider>
-      </AuthProvider>
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

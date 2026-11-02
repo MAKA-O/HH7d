@@ -56,19 +56,22 @@ export function RegisterPage() {
   return (
     <AuthLayout
       title="Создание аккаунта"
-      subtitle="За несколько шагов к первому ИИ-собеседованию: регистрация занимает меньше минуты."
+      subtitle="Минута на регистрацию — и первое ИИ-собеседование можно начинать."
       footer={
         <p>
           Уже есть аккаунт?{' '}
-          <Link to="/login" className="font-medium text-accent-300 transition hover:text-accent-200">
-            Войдите
+          <Link to="/login" className="text-link">
+            Войти
           </Link>
         </p>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error ? (
-          <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-3 text-sm text-rose-200" role="alert">
+          <div
+            className="flex items-start gap-2 rounded-md border border-negative/25 bg-negative-soft px-3 py-2.5 text-13 text-negative"
+            role="alert"
+          >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
@@ -79,7 +82,7 @@ export function RegisterPage() {
             id="full_name"
             type="text"
             autoComplete="name"
-            placeholder="Иван Петров"
+            placeholder="Алексей Смирнов"
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             icon={<UserRound className="h-4 w-4" aria-hidden="true" />}
@@ -92,7 +95,7 @@ export function RegisterPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="student@example.com"
+            placeholder="alexey.smirnov@example.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             icon={<Mail className="h-4 w-4" aria-hidden="true" />}
@@ -114,9 +117,13 @@ export function RegisterPage() {
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-surface-2 hover:text-fg"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
               </button>
             }
             required

@@ -3,14 +3,14 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 /**
- * Лёгкий рендер текста от ИИ: понимает fenced-блоки кода, **жирный**
- * и `встроенный код`. Полноценный markdown не нужен — это ответы ассистента.
+ * Лёгкий рендер текста от ИИ: fenced-блоки кода, **жирный** и `встроенный код`.
+ * Полноценный markdown не нужен — это ответы ассистента.
  */
 export function RichText({ text, className }: { text: string; className?: string }) {
   if (!text) return null
   const blocks = splitCodeBlocks(text)
   return (
-    <div className={cn('space-y-3 text-sm leading-relaxed text-slate-200', className)}>
+    <div className={cn('space-y-3 text-14 leading-relaxed text-fg', className)}>
       {blocks.map((block, index) =>
         block.type === 'code' ? (
           <CodeBlock key={index} language={block.language} code={block.content} />
@@ -66,14 +66,17 @@ function renderInline(text: string): ReactNode[] {
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       return (
-        <strong key={index} className="font-semibold text-slate-50">
+        <strong key={index} className="font-semibold text-fg">
           {part.slice(2, -2)}
         </strong>
       )
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
       return (
-        <code key={index} className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[0.85em] text-accent-200">
+        <code
+          key={index}
+          className="rounded border border-line bg-surface-2 px-1 py-0.5 font-mono text-13 text-fg"
+        >
           {part.slice(1, -1)}
         </code>
       )
@@ -84,11 +87,9 @@ function renderInline(text: string): ReactNode[] {
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-ink-950/80">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 text-[11px] uppercase tracking-wider text-slate-500">
-        <span>{language}</span>
-      </div>
-      <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed text-slate-200">
+    <div className="overflow-hidden rounded-md border border-line">
+      <div className="border-b border-line bg-surface-2 px-3 py-1.5 text-12 text-fg-3">{language}</div>
+      <pre className="overflow-x-auto bg-surface p-3 font-mono text-13 leading-relaxed text-fg">
         <code>{code}</code>
       </pre>
     </div>

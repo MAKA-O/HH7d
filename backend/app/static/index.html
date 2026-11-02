@@ -1,20 +1,36 @@
 <!doctype html>
-<html lang="ru" class="dark">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#05070d" />
+    <meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#090c11" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
-      content="Интеллектуальный тренажёр для подготовки к собеседованиям: ИИ-интервью, разбор ответов, чат по теории и код-ревью."
+      content="Тренажёр для подготовки к техническим собеседованиям: ИИ-сессии с разбором ответов, чат по теории, задачи с кодом и аналитика слабых тем."
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M20 44V20h5l14 16V20h5v24h-5L25 28v16z' fill='white'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M9 22V10h3l8 9v-9h3v12h-3l-8-9v9z' fill='white'/%3E%3C/svg%3E"
     />
     <title>Тренажёр собеседований</title>
-    <script type="module" crossorigin src="/assets/index-PiG1oX5t.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-biQ8vcb6.css">
+    <script>
+      // Светлая тема — по умолчанию. Тёмная применяется до первой отрисовки,
+      // только если пользователь явно выбрал её (или режим «как в системе»).
+      (function () {
+        try {
+          var stored = localStorage.getItem('iq-theme')
+          var dark =
+            stored === 'dark' ||
+            (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (error) {
+          /* приватный режим — остаёмся на светлой теме */
+        }
+      })()
+    </script>
+    <script type="module" crossorigin src="/assets/index-DJ3KjWfG.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-x2BLEqJc.css">
   </head>
   <body>
     <div id="root"></div>

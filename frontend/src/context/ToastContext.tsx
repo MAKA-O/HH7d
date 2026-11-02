@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from 'react'
 
+import { cn } from '@/lib/cn'
+
 type ToastKind = 'success' | 'error' | 'info'
 
 interface ToastItem {
@@ -28,10 +30,10 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
-const KIND_STYLES: Record<ToastKind, string> = {
-  success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
-  error: 'border-rose-500/30 bg-rose-500/10 text-rose-100',
-  info: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
+const KIND_ICON_CLASSES: Record<ToastKind, string> = {
+  success: 'text-positive',
+  error: 'text-negative',
+  info: 'text-accent',
 }
 
 const KIND_ICONS: Record<ToastKind, typeof Info> = {
@@ -89,7 +91,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2 px-4 sm:items-end sm:px-6"
+        className="pointer-events-none fixed inset-x-0 top-3 z-[100] flex flex-col items-center gap-2 px-4 sm:items-end sm:px-4"
       >
         {toasts.map((toast) => {
           const Icon = KIND_ICONS[toast.kind]
@@ -97,17 +99,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={toast.id}
               role="status"
-              className={`pointer-events-auto flex w-full max-w-sm animate-fade-up items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg backdrop-blur-md ${KIND_STYLES[toast.kind]}`}
+              className="pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5 text-13 shadow-pop"
             >
-              <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <p className="flex-1 leading-snug">{toast.message}</p>
+              <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', KIND_ICON_CLASSES[toast.kind])} aria-hidden="true" />
+              <p className="flex-1 leading-snug text-fg">{toast.message}</p>
               <button
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Закрыть уведомление"
-                className="shrink-0 rounded-md p-0.5 opacity-70 transition hover:bg-white/10 hover:opacity-100"
+                className="shrink-0 rounded p-0.5 text-fg-3 transition-colors hover:bg-surface-2 hover:text-fg"
               >
-                <X className="h-4 w-4" aria-hidden="true" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           )

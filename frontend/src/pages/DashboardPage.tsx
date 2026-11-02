@@ -1,45 +1,61 @@
 import {
   AlertCircle,
   ArrowRight,
+  Code2,
   Flame,
   Layers,
   ListChecks,
+  Plus,
   RefreshCw,
   Sparkles,
   Target,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 import { PageHeader } from '@/components/PageHeader'
-import { SessionCard } from '@/components/SessionCard'
+import { SessionTable } from '@/components/SessionTable'
 import { StatCard } from '@/components/StatCard'
 import { Button } from '@/components/ui/Button'
-import { Card, CardHeader } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProgressBar, toneByScore } from '@/components/ui/ProgressBar'
-import { Skeleton, SkeletonStatCard, SkeletonText } from '@/components/ui/Skeleton'
+import { Segmented } from '@/components/ui/Segmented'
+import { Skeleton, SkeletonStatCard, SkeletonTableRows } from '@/components/ui/Skeleton'
+import { Tabs } from '@/components/ui/Tabs'
 import { useAuth } from '@/context/AuthContext'
+import { useTheme } from '@/context/ThemeContext'
 import { api } from '@/lib/api'
-import { formatNumber, formatScore, questionsLabel } from '@/lib/format'
+import { formatNumber, formatScore, plural } from '@/lib/format'
 import { DIFFICULTY_LABELS, labelOf } from '@/lib/labels'
-import type { AnalyticsOut } from '@/lib/types'
+import type { AnalyticsOut, SessionSummary } from '@/lib/types'
 
-/** Короткая подпись даты для оси графика: 2026-10-30 → 30.10. */
+type DashboardTab = 'overview' | 'sessions' | 'topics'
+type Period = '30' | '90' | 'all'
+
+const PERIOD_OPTIONS: Array<{ value: Period; label: string }> = [
+  { value: '30', label: '30 дней' },
+  { value: '90', label: '90 дней' },
+  { value: 'all', label: 'Всё время' },
+]
+
 function shortDate(value: string): string {
   return value.length >= 10 ? `${value.slice(8, 10)}.${value.slice(5, 7)}` : value
 }
 
 export function DashboardPage() {
   const { user } = useAuth()
+  const { resolved } = useTheme()
   const navigate = useNavigate()
 
   const [data, setData] = useState<AnalyticsOut | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<DashboardTab>('overview')
+  const [period, setPeriod] = useState<Period>('90')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,310 +77,479 @@ export function DashboardPage() {
     void load()
   }, [load])
 
-  const firstName = user?.full_name?.trim().split(/\s+/)[0] || 'друг'
-  const chartData = (data?.score_history ?? []).map((point) => ({ date: point.date, score: point.score }))
+  const firstName = user?.full_name?.trim().split(/\s+/)[0] || 'коллега'
+  const inProgress: SessionSummary | undefined = (data?.recent_sessions ?? []).find(
+    (session) => session.status === 'in_progress',
+  )
   const weakTopics = (data?.weak_topics ?? []).slice(0, 5)
   const strongTopics = (data?.strong_topics ?? []).slice(0, 5)
   const difficultyEntries = Object.entries(data?.difficulty_stats ?? {})
-  const inProgress = (data?.recent_sessions ?? []).find((session) => session.status === 'in_progress')
-  const recentSessions = (data?.recent_sessions ?? []).slice(0, 4)
+  const recentSessions = data?.recent_sessions ?? []
+  const hasData = (data?.sessions_count ?? 0) > 0
+
+  const chartData = useMemo(() => {
+    const history = data?.score_history ?? []
+    if (period === 'all') return history.map((point) => ({ date: point.date, score: point.score }))
+    const days = period === '30' ? 30 : 90
+    const cutoff = Date.now() - days * 86_400_000
+    return history
+      .filter((point) => new Date(`${point.date}T00:00:00`).getTime() >= cutoff)
+      .map((point) => ({ date: point.date, score: point.score }))
+  }, [data, period])
+
+  const palette =
+    resolved === 'dark'
+      ? { line: '#3b82f6', fill: '#3b82f6', grid: '#262e39', axis: '#7b8794', tooltip: '#11161d', tooltipText: '#e6e9ee' }
+      : { line: '#2563eb', fill: '#2563eb', grid: '#e2e8f0', axis: '#64748b', tooltip: '#ffffff', tooltipText: '#0f172a' }
+
+  const nextSteps = useMemo(() => {
+    const steps: Array<{ icon: typeof Target; title: string; description: string; href: string }> = []
+    const weakest = weakTopics[0]
+    if (weakest) {
+      steps.push({
+        icon: Target,
+        title: `Сессия с фокусом на «${weakest.topic}»`,
+        description: `Средний балл по теме — ${formatScore(weakest.avg_score)} из 10`,
+        href: '/interview/new',
+      })
+    }
+    steps.push({
+      icon: Code2,
+      title: 'Задача с кодом и разбором',
+      description: 'Практика с ИИ-ревью: оценка, замечания и улучшенный вариант',
+      href: '/code',
+    })
+    steps.push({
+      icon: Flame,
+      title:
+        (data?.streak_days ?? 0) > 0
+          ? `Серия ${data?.streak_days} ${plural(data?.streak_days ?? 0, ['день', 'дня', 'дней'])}`
+          : 'Начните серию занятий',
+      description: 'Регулярные короткие сессии дают больше, чем редкие длинные',
+      href: '/interview/new',
+    })
+    return steps
+  }, [data?.streak_days, weakTopics])
+
+  const tabs = useMemo(
+    () => [
+      { id: 'overview', label: 'Обзор' },
+      { id: 'sessions', label: 'Сессии', count: data?.sessions_count ?? 0 },
+      { id: 'topics', label: 'Темы' },
+    ],
+    [data?.sessions_count],
+  )
 
   return (
     <div>
       <PageHeader
-        eyebrow="Дашборд"
-        title={`Привет, ${firstName}!`}
-        description="Следите за прогрессом, разбирайте слабые темы и тренируйтесь на ИИ-собеседованиях."
+        title={`Здравствуйте, ${firstName}`}
+        description="Сводка по подготовке: динамика баллов, слабые темы и последние собеседования."
         actions={
           <>
-            <Button variant="secondary" onClick={() => navigate('/history')} leftIcon={<Layers className="h-4 w-4" />}>
+            <Button variant="secondary" onClick={() => navigate('/history')}>
               История
             </Button>
-            <Button onClick={() => navigate('/interview/new')} leftIcon={<Sparkles className="h-4 w-4" />}>
-              Начать собеседование
+            <Button onClick={() => navigate('/interview/new')} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+              Новое собеседование
             </Button>
           </>
         }
       />
 
-      {inProgress ? (
-        <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-sky-500/25 bg-sky-500/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-sky-100">У вас есть незавершённое собеседование</p>
-            <p className="mt-0.5 text-xs text-sky-200/60">
-              {questionsLabel(inProgress.question_count)} · отвечено {inProgress.answered_count}
-            </p>
-          </div>
-          <Button variant="secondary" size="sm" onClick={() => navigate(`/interview/${inProgress.id}`)}>
-            Продолжить
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : null}
-
       {error ? (
-        <Card className="border-rose-500/25 bg-rose-500/[0.04]">
+        <Card className="mb-4 border-negative/25 p-4">
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-2.5">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" aria-hidden="true" />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-negative" aria-hidden="true" />
               <div>
-                <p className="text-sm font-medium text-rose-100">Не удалось загрузить дашборд</p>
-                <p className="mt-0.5 text-xs text-rose-200/70">{error}</p>
+                <p className="text-14 font-medium text-fg">Не удалось загрузить данные</p>
+                <p className="mt-0.5 text-13 text-fg-2">{error}</p>
               </div>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => void load()} leftIcon={<RefreshCw className="h-4 w-4" />}>
+            <Button variant="secondary" size="sm" onClick={() => void load()} leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
               Повторить
             </Button>
           </div>
         </Card>
       ) : null}
 
-      {/* Метрики */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {loading || !data ? (
-          <>
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-          </>
-        ) : (
-          <>
-            <StatCard
-              label="Сессий пройдено"
-              value={formatNumber(data.sessions_count)}
-              hint={`завершено ${formatNumber(data.completed_sessions)}`}
-              icon={Layers}
-              tone="accent"
-            />
-            <StatCard
-              label="Средний балл"
-              value={formatScore(data.avg_score)}
-              hint={`лучший результат ${formatScore(data.best_score)}`}
-              icon={Target}
-              tone="emerald"
-            />
-            <StatCard
-              label="Вопросов отвечено"
-              value={formatNumber(data.questions_answered)}
-              hint="по всем сессиям"
-              icon={ListChecks}
-              tone="sky"
-            />
-            <StatCard
-              label="Серия занятий"
-              value={data.streak_days}
-              hint={`${data.streak_days} дн. подряд`}
-              icon={Flame}
-              tone="amber"
-            />
-          </>
-        )}
-      </div>
-
-      {/* График и слабые темы */}
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title="Динамика баллов"
-            description="Средний балл по завершённым сессиям"
-            icon={<TrendingUp className="h-4 w-4" />}
-            action={<span className="text-xs text-slate-500">0–10</span>}
-          />
-          {loading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : chartData.length === 0 ? (
-            <EmptyState
-              compact
-              icon={TrendingUp}
-              title="Пока нет данных для графика"
-              description="Пройдите первое собеседование — динамика баллов появится здесь."
-              action={<Button size="sm" onClick={() => navigate('/interview/new')}>Начать собеседование</Button>}
-            />
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#818cf8" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={shortDate}
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    minTickGap={16}
-                  />
-                  <YAxis
-                    domain={[0, 10]}
-                    ticks={[0, 2, 4, 6, 8, 10]}
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={36}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: '#0c1220',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: '#94a3b8' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelFormatter={(label) => (typeof label === 'string' ? shortDate(label) : label)}
-                    formatter={(value) => [`${formatScore(Number(value))} / 10`, 'Балл']}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#818cf8"
-                    strokeWidth={2}
-                    fill="url(#scoreGradient)"
-                    activeDot={{ r: 4, fill: '#c7d2fe', stroke: '#4f46e5', strokeWidth: 2 }}
-                    dot={{ r: 2.5, fill: '#818cf8', strokeWidth: 0 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+      {inProgress ? (
+        <Card className="mb-4 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-14 font-medium text-fg">Незавершённая сессия #{inProgress.id}</p>
+              <p className="mt-0.5 text-13 text-fg-2">
+                Отвечено {inProgress.answered_count} из {inProgress.question_count} вопросов
+              </p>
             </div>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Слабые темы"
-            description="Темы, где стоит подтянуть знания"
-            icon={<TrendingDown className="h-4 w-4" />}
-          />
-          {loading ? (
-            <SkeletonText lines={5} />
-          ) : weakTopics.length === 0 ? (
-            <EmptyState
-              compact
-              icon={TrendingDown}
-              title="Слабых тем пока нет"
-              description="Появятся после нескольких ответов — ИИ сравнит результаты по темам."
-            />
-          ) : (
-            <div className="space-y-3.5">
-              {weakTopics.map((topic) => (
-                <ProgressBar
-                  key={topic.topic}
-                  label={topic.topic}
-                  valueLabel={`${formatScore(topic.avg_score)} · ${questionsLabel(topic.answers_count)}`}
-                  value={(topic.avg_score / 10) * 100}
-                  tone={toneByScore(topic.avg_score)}
-                  size="sm"
-                />
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Последние сессии и сильные темы */}
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader
-              title="Последние сессии"
-              description="Ваши недавние собеседования"
-              icon={<Layers className="h-4 w-4" />}
-              action={
-                <Button variant="ghost" size="sm" onClick={() => navigate('/history')}>
-                  Все сессии
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              }
-            />
-            {loading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-28 w-full" />
-                <Skeleton className="h-28 w-full" />
-              </div>
-            ) : recentSessions.length === 0 ? (
-              <EmptyState
-                compact
-                icon={Sparkles}
-                title="Собеседований ещё не было"
-                description="Создайте первую сессию: ИИ задаст вопросы по вашему направлению и уровню."
-                action={<Button size="sm" onClick={() => navigate('/interview/new')}>Начать собеседование</Button>}
-              />
-            ) : (
-              <div className="space-y-3">
-                {recentSessions.map((session) => (
-                  <SessionCard key={session.id} session={session} />
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader
-            title="Сильные темы"
-            description="Получается лучше всего"
-            icon={<TrendingUp className="h-4 w-4" />}
-          />
-          {loading ? (
-            <SkeletonText lines={5} />
-          ) : strongTopics.length === 0 ? (
-            <EmptyState compact icon={TrendingUp} title="Данных пока нет" description="Ответьте на несколько вопросов." />
-          ) : (
-            <div className="space-y-3.5">
-              {strongTopics.map((topic) => (
-                <ProgressBar
-                  key={topic.topic}
-                  label={topic.topic}
-                  valueLabel={formatScore(topic.avg_score)}
-                  value={(topic.avg_score / 10) * 100}
-                  tone={toneByScore(topic.avg_score)}
-                  size="sm"
-                />
-              ))}
-            </div>
-          )}
-
-          {!loading && difficultyEntries.length > 0 ? (
-            <div className="mt-5 border-t border-white/5 pt-4">
-              <p className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-500">По сложности</p>
-              <div className="space-y-2.5">
-                {difficultyEntries.map(([difficulty, score]) => (
-                  <ProgressBar
-                    key={difficulty}
-                    label={labelOf(DIFFICULTY_LABELS, difficulty)}
-                    valueLabel={formatScore(score)}
-                    value={(score / 10) * 100}
-                    tone={toneByScore(score)}
-                    size="sm"
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </Card>
-      </div>
-
-      {/* CTA */}
-      <div className="relative mt-5 overflow-hidden rounded-2xl border border-accent-400/25 bg-gradient-to-r from-accent-600/25 via-violet-600/15 to-ink-900 p-6 sm:p-8">
-        <div className="absolute inset-0 bg-grid opacity-40" aria-hidden="true" />
-        <div className="relative flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-50">Готовы проверить себя?</h2>
-            <p className="mt-1 max-w-xl text-sm text-slate-300/80">
-              Выберите направление и уровень — ИИ соберёт вопросы и оценит ответы по четырём критериям.
-            </p>
+            <Button variant="secondary" onClick={() => navigate(`/interview/${inProgress.id}`)} rightIcon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}>
+              Продолжить
+            </Button>
           </div>
-          <Button size="lg" onClick={() => navigate('/interview/new')} rightIcon={<ArrowRight className="h-4 w-4" />}>
-            Начать собеседование
-          </Button>
+        </Card>
+      ) : null}
+
+      {loading ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </div>
+          <div className="grid grid-cols-12 gap-4">
+            <Skeleton className="col-span-12 h-72 rounded-lg xl:col-span-8" />
+            <Skeleton className="col-span-12 h-72 rounded-lg xl:col-span-4" />
+          </div>
+          <SkeletonTableRows rows={4} />
         </div>
-      </div>
+      ) : data ? (
+        <>
+          <Tabs
+            items={tabs}
+            value={tab}
+            onChange={(id) => setTab(id as DashboardTab)}
+            ariaLabel="Разделы дашборда"
+          />
+
+          <div className="mt-5" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+            {tab === 'overview' ? (
+              <div className="space-y-4">
+                {!hasData ? (
+                  <Card className="p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-14 font-medium text-fg">Начните с первого собеседования</p>
+                        <p className="mt-1 max-w-xl text-13 leading-relaxed text-fg-2">
+                          Ответьте на 3–5 вопросов по своей теме — после этого здесь появятся динамика баллов,
+                          слабые темы и рекомендации.
+                        </p>
+                      </div>
+                      <Button onClick={() => navigate('/interview/new')} leftIcon={<Sparkles className="h-4 w-4" aria-hidden="true" />}>
+                        Начать собеседование
+                      </Button>
+                    </div>
+                  </Card>
+                ) : null}
+
+                <p className="text-12 text-fg-3">Показатели за всё время</p>
+
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <StatCard
+                    label="Всего сессий"
+                    value={formatNumber(data.sessions_count)}
+                    hint={`завершено ${formatNumber(data.completed_sessions)}`}
+                    icon={Layers}
+                  />
+                  <StatCard
+                    label="Средний балл"
+                    value={formatScore(data.avg_score)}
+                    hint={`лучший результат ${formatScore(data.best_score)}`}
+                    icon={Target}
+                  />
+                  <StatCard
+                    label="Отвечено вопросов"
+                    value={formatNumber(data.questions_answered)}
+                    hint="за всё время"
+                    icon={ListChecks}
+                  />
+                  <StatCard
+                    label="Серия занятий"
+                    value={data.streak_days}
+                    hint={`${plural(data.streak_days, ['день', 'дня', 'дней'])} подряд`}
+                    icon={Flame}
+                  />
+                </div>
+
+                <div className="grid grid-cols-12 gap-3 sm:gap-4">
+                  <Card className="col-span-12 p-5 xl:col-span-8">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-14 font-semibold text-fg">Динамика баллов</h2>
+                        <p className="mt-0.5 text-13 text-fg-2">Средний балл завершённых сессий</p>
+                      </div>
+                      <Segmented
+                        options={PERIOD_OPTIONS}
+                        value={period}
+                        onChange={setPeriod}
+                        ariaLabel="Период графика"
+                      />
+                    </div>
+
+                    {chartData.length === 0 ? (
+                      <EmptyState
+                        compact
+                        className="mt-4"
+                        icon={TrendingUp}
+                        title="За выбранный период данных нет"
+                        description="Пройдите сессию или выберите больший период."
+                        action={
+                          <Button variant="secondary" size="sm" onClick={() => setPeriod('all')}>
+                            Всё время
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <div className="mt-4 h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                            <CartesianGrid stroke={palette.grid} vertical={false} />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={shortDate}
+                              tick={{ fill: palette.axis, fontSize: 12 }}
+                              axisLine={false}
+                              tickLine={false}
+                              minTickGap={16}
+                            />
+                            <YAxis
+                              domain={[0, 10]}
+                              ticks={[0, 2, 4, 6, 8, 10]}
+                              tick={{ fill: palette.axis, fontSize: 12 }}
+                              axisLine={false}
+                              tickLine={false}
+                              width={36}
+                            />
+                            <Tooltip
+                              cursor={{ stroke: palette.grid }}
+                              contentStyle={{
+                                background: palette.tooltip,
+                                border: `1px solid ${palette.grid}`,
+                                borderRadius: 6,
+                                boxShadow: resolved === 'dark' ? '0 8px 24px rgba(0,0,0,.5)' : '0 4px 16px rgba(15,23,42,.1)',
+                                fontSize: 12,
+                                color: palette.tooltipText,
+                              }}
+                              labelStyle={{ color: palette.axis }}
+                              itemStyle={{ color: palette.tooltipText }}
+                              labelFormatter={(label) => (typeof label === 'string' ? shortDate(label) : label)}
+                              formatter={(value) => [`${formatScore(Number(value))} из 10`, 'Балл']}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="score"
+                              stroke={palette.line}
+                              strokeWidth={2}
+                              fill={palette.fill}
+                              fillOpacity={0.08}
+                              dot={{ r: 2.5, fill: palette.line, strokeWidth: 0 }}
+                              activeDot={{ r: 4, fill: palette.line, strokeWidth: 0 }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </Card>
+
+                  <Card className="col-span-12 p-5 xl:col-span-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-14 font-semibold text-fg">Темы для повторения</h2>
+                        <p className="mt-0.5 text-13 text-fg-2">На основе средних баллов</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTab('topics')}
+                        className="text-13 font-medium text-accent transition-colors hover:text-accent-hover"
+                      >
+                        Все темы
+                      </button>
+                    </div>
+
+                    {weakTopics.length === 0 ? (
+                      <EmptyState
+                        compact
+                        className="mt-4"
+                        icon={TrendingDown}
+                        title="Слабых тем пока нет"
+                        description="Появятся после нескольких ответов по разным темам."
+                      />
+                    ) : (
+                      <ul className="mt-4 space-y-3.5">
+                        {weakTopics.map((topic) => (
+                          <li key={topic.topic}>
+                            <ProgressBar
+                              label={topic.topic}
+                              valueLabel={formatScore(topic.avg_score)}
+                              value={(topic.avg_score / 10) * 100}
+                              tone={toneByScore(topic.avg_score)}
+                              size="sm"
+                            />
+                            <p className="mt-1 text-12 text-fg-3">
+                              {topic.answers_count} {plural(topic.answers_count, ['ответ', 'ответа', 'ответов'])}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-12 gap-3 sm:gap-4">
+                  <Card className="col-span-12 overflow-hidden xl:col-span-8">
+                    <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+                      <h2 className="text-14 font-semibold text-fg">Последние сессии</h2>
+                      <Link to="/history" className="text-13 font-medium text-accent transition-colors hover:text-accent-hover">
+                        Вся история
+                      </Link>
+                    </div>
+                    {recentSessions.length === 0 ? (
+                      <EmptyState
+                        compact
+                        className="m-4"
+                        icon={Layers}
+                        title="Сессий пока нет"
+                        description="Создайте первую сессию — она появится в списке."
+                        action={<Button size="sm" onClick={() => navigate('/interview/new')}>Начать собеседование</Button>}
+                      />
+                    ) : (
+                      <SessionTable sessions={recentSessions.slice(0, 5)} />
+                    )}
+                  </Card>
+
+                  <Card className="col-span-12 p-5 xl:col-span-4">
+                    <h2 className="text-14 font-semibold text-fg">Следующие шаги</h2>
+                    <p className="mt-0.5 text-13 text-fg-2">Что даст наибольший прирост</p>
+                    <ul className="mt-2 divide-y divide-line">
+                      {nextSteps.map((step) => {
+                        const Icon = step.icon
+                        return (
+                          <li key={step.title}>
+                            <Link
+                              to={step.href}
+                              className="-mx-2 flex items-start gap-2.5 rounded-md px-2 py-3 transition-colors hover:bg-surface-2"
+                            >
+                              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-fg-3" aria-hidden="true" />
+                              <span className="min-w-0">
+                                <span className="block text-13 font-medium text-fg">{step.title}</span>
+                                <span className="block text-12 leading-relaxed text-fg-3">{step.description}</span>
+                              </span>
+                            </Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </Card>
+                </div>
+              </div>
+            ) : null}
+
+            {tab === 'sessions' ? (
+              <Card className="overflow-hidden">
+                <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+                  <div>
+                    <h2 className="text-14 font-semibold text-fg">Недавние сессии</h2>
+                    <p className="mt-0.5 text-13 text-fg-2">Всего {formatNumber(data.sessions_count)} за всё время</p>
+                  </div>
+                  <Link to="/history" className="text-13 font-medium text-accent transition-colors hover:text-accent-hover">
+                    Открыть историю
+                  </Link>
+                </div>
+                {recentSessions.length === 0 ? (
+                  <EmptyState
+                    className="m-4"
+                    icon={Layers}
+                    title="История пуста"
+                    description="Пройдите первое собеседование, чтобы увидеть здесь результаты."
+                    action={<Button onClick={() => navigate('/interview/new')}>Начать собеседование</Button>}
+                  />
+                ) : (
+                  <SessionTable sessions={recentSessions} />
+                )}
+              </Card>
+            ) : null}
+
+            {tab === 'topics' ? (
+              <div className="grid grid-cols-12 gap-3 sm:gap-4">
+                <Card className="col-span-12 p-5 lg:col-span-6">
+                  <h2 className="text-14 font-semibold text-fg">Слабые темы</h2>
+                  <p className="mt-0.5 text-13 text-fg-2">Стоит повторить в первую очередь</p>
+                  {weakTopics.length === 0 ? (
+                    <EmptyState
+                      compact
+                      className="mt-4"
+                      icon={TrendingDown}
+                      title="Слабых тем нет"
+                      description="Ответьте на вопросы разных тем — статистика появится автоматически."
+                    />
+                  ) : (
+                    <ul className="mt-4 space-y-3.5">
+                      {weakTopics.map((topic) => (
+                        <li key={topic.topic}>
+                          <ProgressBar
+                            label={topic.topic}
+                            valueLabel={formatScore(topic.avg_score)}
+                            value={(topic.avg_score / 10) * 100}
+                            tone={toneByScore(topic.avg_score)}
+                            size="sm"
+                          />
+                          <p className="mt-1 text-12 text-fg-3">
+                            {topic.answers_count} {plural(topic.answers_count, ['ответ', 'ответа', 'ответов'])}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+
+                <Card className="col-span-12 p-5 lg:col-span-6">
+                  <h2 className="text-14 font-semibold text-fg">Сильные темы</h2>
+                  <p className="mt-0.5 text-13 text-fg-2">Здесь вы уже отвечаете уверенно</p>
+                  {strongTopics.length === 0 ? (
+                    <EmptyState
+                      compact
+                      className="mt-4"
+                      icon={TrendingUp}
+                      title="Данных пока нет"
+                      description="Ответьте на несколько вопросов, чтобы увидеть сильные стороны."
+                    />
+                  ) : (
+                    <ul className="mt-4 space-y-3.5">
+                      {strongTopics.map((topic) => (
+                        <li key={topic.topic}>
+                          <ProgressBar
+                            label={topic.topic}
+                            valueLabel={formatScore(topic.avg_score)}
+                            value={(topic.avg_score / 10) * 100}
+                            tone={toneByScore(topic.avg_score)}
+                            size="sm"
+                          />
+                          <p className="mt-1 text-12 text-fg-3">
+                            {topic.answers_count} {plural(topic.answers_count, ['ответ', 'ответа', 'ответов'])}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+
+                <Card className="col-span-12 p-5">
+                  <h2 className="text-14 font-semibold text-fg">Средний балл по сложности</h2>
+                  <p className="mt-0.5 text-13 text-fg-2">Насколько уверенно вы держитесь на каждом уровне</p>
+                  {difficultyEntries.length === 0 ? (
+                    <EmptyState compact className="mt-4" icon={Target} title="Данных пока нет" description="Пройдите сессию с вопросами разной сложности." />
+                  ) : (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                      {difficultyEntries.map(([difficulty, score]) => (
+                        <div key={difficulty}>
+                          <ProgressBar
+                            label={labelOf(DIFFICULTY_LABELS, difficulty)}
+                            valueLabel={formatScore(score)}
+                            value={(score / 10) * 100}
+                            tone={toneByScore(score)}
+                            size="sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

@@ -13,23 +13,23 @@ interface EmptyStateProps {
   compact?: boolean
 }
 
-/** Единое пустое состояние: иконка, заголовок, пояснение и действие. */
+/** Пустое состояние: пунктирная рамка, иконка, заголовок, пояснение и действие. */
 export function EmptyState({ title, description, icon: Icon, action, className, compact = false }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-center',
-        compact ? 'px-4 py-6' : 'px-6 py-12',
+        'flex flex-col items-center justify-center rounded-lg border border-dashed border-line-strong bg-surface-2/40 text-center',
+        compact ? 'px-4 py-6' : 'px-6 py-10',
         className,
       )}
     >
       {Icon ? (
-        <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-accent-300">
-          <Icon className="h-5 w-5" aria-hidden="true" />
+        <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-line bg-surface text-fg-3">
+          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
         </span>
       ) : null}
-      <p className="text-sm font-medium text-slate-200">{title}</p>
-      {description ? <p className="mt-1 max-w-sm text-sm text-slate-400">{description}</p> : null}
+      <p className="text-14 font-medium text-fg">{title}</p>
+      {description ? <p className="mt-1 max-w-sm text-13 leading-relaxed text-fg-2">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   )
