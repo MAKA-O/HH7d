@@ -1,0 +1,29 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.pip-cache/
+.coverage
+htmlcov/
+
+# --- Node / фронтенд ---
+node_modules/
+frontend/dist/
+frontend/node_modules/
+.npm-cache/
+.npm-tmp/
+.npmtest/
+
+# --- Данные и секреты ---
+backend/data/*.db
+backend/data/*.db-journal
+backend/data/*.db-wal
+backend/data/*.db-shm
+backend/.env
+
+# --- Временное ---
+.tmp/
+.deps_test/
+*.log
