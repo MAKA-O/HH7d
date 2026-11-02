@@ -59,7 +59,20 @@ class Settings(BaseSettings):
     ai_provider: str = "auto"
     ai_base_url: str = OPENAI_DEFAULT_BASE_URL
     ai_api_key: str = ""
+    # Несколько ключей API через запятую — из РАЗНЫХ проектов Google/провайдера
+    # (квота считается на проект, поэтому второй проект = отдельные лимиты).
+    # Пусто — используется старый AI_API_KEY.
+    ai_api_keys: str = ""
     ai_model: str = "gpt-4o-mini"
+    # Резервные модели через запятую: используются после ai_model при 429/404/503.
+    # Пример: gemini-3.6-flash,gemini-3.8-flash,gemini-3.5-flash
+    ai_model_fallbacks: str = ""
+    # «Остывание» связки ключ+модель (секунды) при исчерпанной квоте (429 quota).
+    ai_quota_cooldown_sec: int = 900
+    # «Остывание» ключа при 401/403 (невалидный/заблокированный ключ).
+    ai_key_cooldown_sec: int = 3600
+    # «Остывание» модели при 404 / 400 «model not found/not supported».
+    ai_model_cooldown_sec: int = 3600
     # Управление «размышлением» модели (Gemini 3.x/4, reasoning-модели):
     #   minimal | low | medium | high | none | пусто (не передавать).
     # Для Gemini по умолчанию minimal — заметно быстрее, чем режим по умолчанию.
@@ -99,16 +112,37 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def api_key_list(self) -> list[str]:
+        """Список ключей API: ``AI_API_KEYS`` (разные проекты) или ``AI_API_KEY``."""
+        raw = self.ai_api_keys or ""
+        keys = [part.strip() for part in raw.split(",") if part.strip()]
+        if not keys:
+            single = (self.ai_api_key or "").strip()
+            keys = [single] if single else []
+        return keys
+
+    @property
+    def model_list(self) -> list[str]:
+        """Цепочка моделей: основная ``AI_MODEL``, затем ``AI_MODEL_FALLBACKS``."""
+        models: list[str] = []
+        primary = (self.ai_model or "").strip()
+        if primary:
+            models.append(primary)
+        for part in (self.ai_model_fallbacks or "").split(","):
+            name = part.strip()
+            if name and name not in models:
+                models.append(name)
+        return models
+
+    @property
     def ai_enabled(self) -> bool:
         """Есть ли реальный провайдер (не офлайн)."""
         provider = (self.ai_provider or "auto").lower()
         if provider == "offline":
             return False
-        if provider == "auto":
-            return bool(self.ai_api_key.strip())
         if provider == "ollama":
             return True
-        return bool(self.ai_api_key.strip())
+        return bool(self.api_key_list)
 
 
 @lru_cache

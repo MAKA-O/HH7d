@@ -2,6 +2,9 @@
 
 Реализация ``AIService`` поверх ``app.ai.providers.LLMClient``:
 * каждый метод формирует сообщения из ``app.ai.prompts`` и просит строгий JSON;
+* при 429 (квота), 404/400 (модель) и 503 (перегрузка) клиент автоматически
+  перебирает цепочку «ключ + модель» (``AI_MODEL_FALLBACKS``, ``AI_API_KEYS``),
+  а ``/api/ai/health`` показывает активную связку «модель + ключ»;
 * ответ валидируется pydantic-схемами из ``app.ai.base``;
 * при невалидном JSON выполняется ровно один повтор с уточнением, после чего
   поднимается ``LLMError`` — ``AIServiceImpl`` (app/ai/service.py) прозрачно
@@ -183,14 +186,17 @@ class LiveEngine(AIService):
         return self._client.model
 
     def health(self) -> AIHealthInfo:
-        """Состояние провайдера с фактическим ping ``/models``."""
+        """Состояние провайдера с фактическим ping и активной связкой."""
         if not self.available:
             return AIHealthInfo(
                 provider=self._provider,
                 model=self._client.model,
                 mode="live",
                 available=False,
-                message="Ключ API не задан — доступен только офлайн-режим",
+                message=(
+                    "Ключ API не задан (AI_API_KEY / AI_API_KEYS) — "
+                    "доступен только офлайн-режим"
+                ),
             )
         ok, message = self._client.ping()
         return AIHealthInfo(

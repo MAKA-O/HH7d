@@ -65,6 +65,15 @@ def measure(label: str, fn):
         return None
 
 
+def mask_key(key: str) -> str:
+    """Маскирует ключ API для вывода в консоль."""
+    if not key:
+        return "(пусто)"
+    if len(key) <= 10:
+        return key[:2] + "…" + key[-2:] if len(key) > 4 else "…"
+    return f"{key[:6]}…{key[-4:]}"
+
+
 def main() -> int:
     reset_ai_service()
     ai = get_ai_service()
@@ -73,18 +82,43 @@ def main() -> int:
     print("Режим ИИ и параметры")
     print("=" * 66)
     print(f"  provider          : {settings.ai_provider}")
-    print(f"  model             : {settings.ai_model}")
     print(f"  base_url          : {settings.ai_base_url}")
+    models = settings.model_list
+    print(f"  model chain       : {' -> '.join(models)}")
+    print(f"  модель (основная) : {settings.ai_model}")
+    keys = settings.api_key_list
+    print(f"  API-ключей        : {len(keys)} (разные проекты = разные квоты)")
+    for index, key in enumerate(keys, start=1):
+        print(f"    ключ {index:<2}         : {mask_key(key)}")
+    if not keys:
+        print("    (ключей нет — работает офлайн-движок)")
     print(f"  reasoning_effort  : {settings.ai_reasoning_effort or '(не задан)'}")
     print(f"  timeout           : {settings.ai_timeout_sec} с")
     print(f"  max_retries       : {settings.ai_max_retries}")
+    print(
+        "  cooldown-ы        : "
+        f"квота {settings.ai_quota_cooldown_sec} с, "
+        f"ключ {settings.ai_key_cooldown_sec} с, "
+        f"модель {settings.ai_model_cooldown_sec} с"
+    )
 
     info = measure("health / ping", lambda: ai.health())
     if info is not None:
-        print(f"    -> режим: {info.mode}, provider: {info.provider}, модель: {info.model}")
+        print(f"    -> режим: {info.mode}, provider: {info.provider}")
+        print(f"    -> модель (активная): {info.model}")
         if info.latency_ms is not None:
             print(f"    -> задержка ping: {info.latency_ms / 1000:.2f} с")
         print(f"    -> сообщение: {info.message}")
+        live = getattr(ai, "_live", None)
+        client = getattr(live, "_client", None) if live is not None else None
+        if client is not None:
+            print(f"    -> цепочка моделей : {' -> '.join(client.models)}")
+            print(f"    -> активный ключ   : #{client.key_number}")
+            if client.active_pair is not None:
+                print(
+                    f"    -> активная связка : модель {client.active_pair[1]}, "
+                    f"ключ #{client.active_pair[0] + 1}"
+                )
 
     print()
     print("=" * 66)
