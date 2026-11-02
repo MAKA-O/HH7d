@@ -164,7 +164,7 @@ class LiveEngine(AIService):
     def __init__(self, client: LLMClient | None = None) -> None:
         self._client = client or LLMClient()
         provider = (settings.ai_provider or "auto").lower()
-        self._provider = provider if provider in ("openai", "ollama") else "openai"
+        self._provider = provider if provider in ("openai", "ollama", "gemini") else "openai"
 
     # --------------------------------------------------------- служебное
     @property

@@ -105,6 +105,9 @@ class LLMClient:
         self._client: httpx.Client | None = None
         # Без ключа API работают только локальные серверы (Ollama).
         self._key_optional = (settings.ai_provider or "auto").lower() == "ollama"
+        # Кэш результата health-проверки, чтобы опросы UI не тратили токены.
+        self._ping_cache: tuple[float, tuple[bool, str]] | None = None
+        self._ping_ttl_sec = 60.0
 
     # ----------------------------------------------------------- настройки
     @property
@@ -369,14 +372,38 @@ class LLMClient:
                 models.append(value)
         return models
 
-    def ping(self) -> tuple[bool, str]:
-        """Фактическая проверка доступности провайдера."""
+    def ping(self, *, use_cache: bool = True) -> tuple[bool, str]:
+        """Фактическая проверка доступности провайдера.
+
+        Сначала пробуем ``GET /models``. Если провайдер его не поддерживает
+        (так ведёт себя OpenAI-совместимый шлюз Gemini), проверяем минимальным
+        chat-запросом. Результат кэшируется на минуту.
+        """
         if not self.configured:
             return False, "Ключ API не задан — доступен только офлайн-режим"
+        now = time.monotonic()
+        if use_cache and self._ping_cache is not None:
+            cached_at, cached_result = self._ping_cache
+            if now - cached_at < self._ping_ttl_sec:
+                return cached_result
+        result = self._ping_uncached()
+        self._ping_cache = (now, result)
+        return result
+
+    def _ping_uncached(self) -> tuple[bool, str]:
         try:
             models = self.list_models(timeout=min(max(self.timeout, 3.0), 10.0))
         except LLMError as exc:
-            return False, f"LLM-провайдер недоступен: {exc}"
+            logger.info("Провайдер не отдал /models (%s), проверяю chat-запросом", exc)
+            try:
+                self.chat(
+                    [{"role": "user", "content": "ping"}],
+                    temperature=0.0,
+                    timeout=min(max(self.timeout, 5.0), 20.0),
+                )
+            except LLMError as chat_exc:
+                return False, f"LLM-провайдер недоступен: {chat_exc}"
+            return True, "Модель отвечает (проверка chat-запросом: /models недоступен)"
         if models and self.model and not any(
             self.model == item or self.model in item for item in models
         ):

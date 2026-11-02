@@ -2,9 +2,18 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # .../backend
+
+# Адреса провайдеров по умолчанию
+OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
+# Gemini: официальный OpenAI-совместимый шлюз
+# https://ai.google.dev/gemini-api/docs/openai
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_DEFAULT_MODEL = "gemini-3.8-flash"
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
 
 class Settings(BaseSettings):
@@ -37,14 +46,16 @@ class Settings(BaseSettings):
     ]
 
     # --- ИИ ---
-    # auto | openai | ollama | offline
+    # auto | openai | gemini | ollama | offline
     #   auto     — если задан AI_API_KEY, работаем через OpenAI-совместимый API,
     #              иначе используем локальный офлайн-движок;
     #   openai   — OpenAI / OpenRouter / DeepSeek / VseGPT и любой совместимый API;
     #   ollama   — локальный сервер Ollama (http://localhost:11434/v1);
     #   offline  — принудительно встроенный офлайн-движок (демо без ключа).
+    # Для Gemini достаточно AI_PROVIDER=gemini и ключа — адрес OpenAI-совместимого
+    # шлюза и модель подставятся автоматически (см. _apply_provider_defaults).
     ai_provider: str = "auto"
-    ai_base_url: str = "https://api.openai.com/v1"
+    ai_base_url: str = OPENAI_DEFAULT_BASE_URL
     ai_api_key: str = ""
     ai_model: str = "gpt-4o-mini"
     ai_temperature: float = 0.6
@@ -57,6 +68,26 @@ class Settings(BaseSettings):
 
     # Папка для SQLite
     data_dir: str = str(BASE_DIR / "data")
+
+    @model_validator(mode="after")
+    def _apply_provider_defaults(self) -> "Settings":
+        """Подставляет адрес и модель по умолчанию для выбранного провайдера.
+
+        Благодаря этому пользователю достаточно указать AI_PROVIDER=gemini и ключ —
+        адрес Gemini OpenAI-совместимого шлюза и модель подставятся сами.
+        """
+        provider = (self.ai_provider or "auto").strip().lower()
+        base_url = (self.ai_base_url or "").strip().rstrip("/")
+        if provider == "gemini":
+            if not base_url or base_url == OPENAI_DEFAULT_BASE_URL:
+                self.ai_base_url = GEMINI_BASE_URL
+            if not self.ai_model or self.ai_model == "gpt-4o-mini":
+                self.ai_model = GEMINI_DEFAULT_MODEL
+        elif provider == "ollama":
+            if not base_url or base_url == OPENAI_DEFAULT_BASE_URL:
+                self.ai_base_url = OLLAMA_BASE_URL
+        self.ai_provider = provider
+        return self
 
     @property
     def ai_enabled(self) -> bool:
