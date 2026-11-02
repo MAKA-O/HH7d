@@ -31,6 +31,8 @@ class AIServiceImpl(AIService):
     def __init__(self) -> None:
         self._live = self._build_live()
         self._offline = self._build_offline()
+        if self._live is None and self._offline is None:
+            logger.error("ИИ-слой не инициализирован: нет ни live-, ни offline-движка")
         logger.info(
             "ИИ-сервис запущен: mode=%s, live=%s",
             "live" if self._live is not None else "offline",
@@ -52,10 +54,14 @@ class AIServiceImpl(AIService):
             return None
 
     @staticmethod
-    def _build_offline() -> AIService:
-        from app.ai.offline import OfflineEngine
+    def _build_offline() -> AIService | None:
+        try:
+            from app.ai.offline import OfflineEngine
 
-        return OfflineEngine()
+            return OfflineEngine()
+        except Exception as exc:  # модуль ещё не реализован / сломан
+            logger.error("Не удалось инициализировать офлайн-движок ИИ: %s", exc)
+            return None
 
     # ---------------------------------------------------------------- вызовы
     def _live_call(self, method: str, /, **kwargs: Any) -> Any:
@@ -64,6 +70,8 @@ class AIServiceImpl(AIService):
         return getattr(self._live, method)(**kwargs)
 
     def _offline_call(self, method: str, /, **kwargs: Any) -> Any:
+        if self._offline is None:
+            raise RuntimeError("Офлайн-движок ИИ недоступен")
         return getattr(self._offline, method)(**kwargs)
 
     def _dispatch(self, method: str, /, **kwargs: Any) -> Any:
@@ -137,4 +145,6 @@ class AIServiceImpl(AIService):
                     return info
             except Exception as exc:  # pragma: no cover
                 logger.warning("Проверка здоровья живой модели не удалась: %s", exc)
+        if self._offline is None:
+            raise RuntimeError("ИИ-слой недоступен")
         return self._offline.health()

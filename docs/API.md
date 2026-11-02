@@ -112,7 +112,7 @@ session status: in_progress | completed
 `400` — нет ни одного отвеченного вопроса.
 
 ### `POST /api/interviews/{id}/questions/next` → `201` `QuestionOut`
-Адаптивный доп. вопрос (учитывает слабые места). Увеличивает `questions_count`.
+Адаптивный доп. вопрос (учитывает слабые места). Увеличивает `question_count`.
 
 ## 4. Чат-ассистент по теории
 
@@ -196,9 +196,9 @@ data: [DONE]
 ## Схемы (кратко)
 
 ```
-UserOut:        id, email, full_name, target_role, target_level, created_at
+UserOut:        id, email, full_name, target_role, target_level, resume_text, created_at
 ProfileIn:      full_name?, target_role?, target_level?, resume_text?
-SessionSummary: id, role, level, mode, status, overall_score, questions_count,
+SessionSummary: id, role, level, mode, status, overall_score, question_count,
                 answered_count, started_at, finished_at, duration_sec
 SessionDetail:  SessionSummary + questions[QuestionOut] + answers[AnswerResult] + report?
 QuestionOut:    id, order_index, type, topic, difficulty, text, starter_code?, language?

@@ -26,4 +26,6 @@ backend/.env
 # --- Временное ---
 .tmp/
 .deps_test/
+.playwright-browsers/
+.chrome-profile/
 *.log

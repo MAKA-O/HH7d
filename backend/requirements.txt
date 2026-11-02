@@ -10,4 +10,3 @@ python-multipart==0.0.33
 
 # Разработка и тесты
 pytest==9.2.0
-pytest-cov==7.0.0

@@ -92,6 +92,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(_build_api_router())
     _mount_frontend(app)
+    # Идемпотентно: таблицы нужны и при запуске без ASGI-lifespan (например, в тестах)
+    init_db()
     return app
 
 

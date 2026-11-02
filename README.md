@@ -1,0 +1,238 @@
+# Интеллектуальный тренажёр для подготовки к собеседованиям
+
+Веб-приложение, которое имитирует техническое собеседование и даёт развёрнутую
+обратную связь по каждому ответу. Тренажёр задаёт вопросы по выбранному направлению
+и уровню, оценивает ответы с помощью ИИ по четырём критериям, объясняет ошибки,
+показывает эталонный ответ, ведёт чат-консультацию по теории, проверяет решения
+задач по коду и собирает аналитику прогресса.
+
+Проект состоит из двух частей: REST API на FastAPI и SPA на React + TypeScript.
+После сборки фронтенда всё приложение раздаётся одним процессом `uvicorn`
+(собранный бандл лежит в `backend/app/static`). Данные хранятся в SQLite,
+аутентификация — JWT.
+
+ИИ-слой спроектирован с двумя движками: **Live** (любой OpenAI-совместимый API —
+OpenAI, OpenRouter, DeepSeek, локальная Ollama) и **Offline** (детерминированный
+локальный движок на встроенном банке вопросов и эвристиках). При отсутствии ключа
+или ошибке внешней модели сервис автоматически переключается на офлайн-движок,
+поэтому полный сценарий тренировки работает без интернета и без оплаты API.
+
+```text
+┌────────────────────┐   JSON / SSE    ┌──────────────────────────────────────────────┐
+│  SPA (React + TS)  │────────────────►│ FastAPI: /api/auth, /api/interviews,         │
+│  дашборд, сессия,  │◄────────────────│ /api/chat, /api/code, /api/analytics, …      │
+│  чат, код, профиль │                 │                                              │
+└────────────────────┘                 │  ┌────────────────────────────────────────┐  │
+                                       │  │ ИИ-слой (AIService + fallback)         │  │
+                                       │  │ Live    ──► внешняя LLM (опционально)  │  │
+                                       │  │ Offline ──► банк вопросов и эвристики  │  │
+                                       │  └────────────────────────────────────────┘  │
+                                       │  SQLAlchemy ──► SQLite backend/data/app.db   │
+                                       └──────────────────────────────────────────────┘
+```
+
+## Возможности
+
+| Блок | Что делает пользователь | Как это реализовано |
+|---|---|---|
+| Аутентификация | Регистрация и вход по email/паролю | `POST /api/auth/register`, `POST /api/auth/login`, JWT (HS256) на 7 дней, пароли — PBKDF2-SHA256 |
+| Профиль | Указывает направление подготовки и уровень, добавляет текст резюме | `GET/PUT /api/profile`; резюме учитывается при генерации вопросов |
+| Собеседование | Выбирает роль (backend, frontend, QA, аналитика, DevOps, HR), уровень (intern…senior), режим (теория / смешанный / с кодом) и число вопросов | `POST /api/interviews`; вопросы генерирует ИИ, при сбое — встроенный банк |
+| Ответы и ИИ-оценка | Отвечает текстом (в UI — в том числе голосом через Web Speech API), получает балл 0–10 по критериям `correctness`, `completeness`, `depth`, `clarity`, список сильных сторон и пробелов, эталонный ответ и рекомендацию | `POST /api/interviews/{id}/answers` |
+| Адаптивность | Запрашивает дополнительный вопрос по слабым темам | `POST /api/interviews/{id}/questions/next` (до 30 вопросов в сессии) |
+| Итоговый отчёт | Завершает сессию и получает сводный вердикт, оценки по темам и рекомендации | `POST /api/interviews/{id}/finish` |
+| История | Смотрит, фильтрует и удаляет прошлые сессии | `GET /api/interviews`, `GET /api/interviews/{id}`, `DELETE /api/interviews/{id}` |
+| Чат по теории | Задаёт вопросы ассистенту, получает потоковый (SSE) ответ, создаёт и удаляет диалоги | `/api/chat/conversations…` |
+| Код-ревью | Генерирует задачу по теме/языку/сложности, отправляет решение и получает ревью без исполнения кода: оценку, замечания (`critical`/`major`/`minor`/`nit`), улучшенный вариант, оценку сложности | `POST /api/code/tasks`, `POST /api/code/tasks/{id}/review`, `GET /api/code/history` |
+| Аналитика | Видит количество сессий, средний и лучший балл, число отвеченных вопросов, стрик, слабые/сильные темы, динамику оценок | `GET /api/analytics/overview` |
+| Состояние ИИ | Видит в интерфейсе, какой движок активен — `live` или `offline` | `GET /api/ai/health`; сводка также в `GET /api/health` |
+| Распознавание речи | Говорит вместо набора ответа | В интерфейсе — Web Speech API браузера (`ru-RU`) с аккуратным fallback; для интеграций доступен серверный `POST /api/voice/transcribe` (Whisper через OpenAI-совместимый провайдер, `503` при недоступности) |
+
+Направления и темы задаются справочником (`backend/app/data/catalog.py`),
+контент — встроенным банком (`backend/app/data/question_bank.py`: 163 вопроса
+и 18 задач по коду, 39 тем по шести направлениям). Банк используется и
+ИИ-слоем, и офлайн-движком, поэтому тренировка работает без ключей API.
+
+## Технологический стек
+
+| Слой | Технологии |
+|---|---|
+| Backend | Python 3.12, FastAPI 0.162, Uvicorn 0.54, Pydantic v2 (2.14) и pydantic-settings, SQLAlchemy 2.1 (ORM, `Mapped`/`mapped_column`), PyJWT 2.15, httpx 0.28 |
+| База данных | SQLite (файл `backend/data/app.db`, создаётся автоматически); подключение через `DATABASE_URL` |
+| Frontend | React 18, TypeScript 5.6, Vite 8, TailwindCSS 3.4, react-router-dom 6, recharts, lucide-react; SSE-стриминг чата через `fetch` + `ReadableStream`; Web Speech API для голосового ввода |
+| ИИ-слой | Собственный провайдер-агностичный клиент `POST {AI_BASE_URL}/chat/completions`; JSON-схемы Pydantic; промпты на русском; потоковые ответы; fallback на офлайн-движок |
+| Тесты | pytest, FastAPI `TestClient`; сквозной сценарий `backend/scripts/smoke_check.py` |
+| Развёртывание | Один процесс `uvicorn`, статика из `backend/app/static`; `.env` для конфигурации |
+
+## Быстрый старт (Windows)
+
+Требования: Python 3.12, Node.js 20+ и npm, PowerShell.
+
+### 0. Короткий путь
+
+```powershell
+Set-Location C:\Users\MILLER\Downloads\HH7d
+.\scripts\setup.ps1      # один раз: venv + pip install + npm install
+.\scripts\start.ps1      # сборка фронтенда (если нужно) + запуск на http://127.0.0.1:8000
+```
+
+Если порт 8000 занят: `.\scripts\start.ps1 -Port 8100`. Ниже — те же шаги вручную
+(удобно, если нужно контролировать процесс или ставить компоненты по отдельности).
+
+### 1. Зависимости бэкенда
+
+```powershell
+$ws = "C:\Users\MILLER\Downloads\HH7d"
+Set-Location $ws
+
+python -m venv .venv
+& "$ws\.venv\Scripts\python.exe" -m pip install -r backend\requirements.txt
+```
+
+> В песочнице этого проекта перед любыми Python-командами дополнительно задаётся
+> `$env:PYTHONPATH = "$ws\tools\pyfix"` — см. [docs/DEV_SETUP.md](docs/DEV_SETUP.md).
+
+### 2. Конфигурация
+
+```powershell
+Copy-Item "$ws\backend\.env.example" "$ws\backend\.env"
+notepad "$ws\backend\.env"
+```
+
+Минимально достаточно оставить `AI_PROVIDER=auto` и пустой `AI_API_KEY` — приложение
+запустится в офлайн-режиме и будет полностью работоспособно. Для живого ИИ задайте
+ключ и модель (варианты для OpenAI / OpenRouter / DeepSeek / Ollama перечислены
+комментариями в `.env.example`).
+
+### 3. Сборка фронтенда
+
+```powershell
+Set-Location "$ws\frontend"
+npm install
+npm run build
+```
+
+`frontend/vite.config.ts` настроен так, что результат сборки попадает в
+`backend/app/static` (`emptyOutDir: true`). После этого SPA и API раздаются
+одним сервером. Особенности установки и сборки в ограниченной песочнице Windows
+(флаги `npm install`, Vite 8) описаны в [frontend/README.md](frontend/README.md)
+и [docs/DEV_SETUP.md](docs/DEV_SETUP.md).
+
+### 4. Запуск
+
+```powershell
+$ws = "C:\Users\MILLER\Downloads\HH7d"
+Set-Location "$ws\backend"
+& "$ws\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+| Адрес | Назначение |
+|---|---|
+| http://127.0.0.1:8000/ | Приложение (SPA) |
+| http://127.0.0.1:8000/api/health | Проверка работоспособности, режим ИИ |
+| http://127.0.0.1:8000/api/docs | Swagger UI (OpenAPI) |
+
+Для разработки фронтенда отдельно: `npm run dev` в `frontend/` — Vite-сервер
+на `http://127.0.0.1:5173` с проксированием `/api` на `http://127.0.0.1:8000`.
+
+## Тестовые аккаунты
+
+| Аккаунт | Пароль | Назначение |
+|---|---|---|
+| `demo@trainer.ru` | `demo1234` | Демонстрационный пользователь с заполненной историей сессий, чатов и код-ревью |
+
+Демо-данные создаются идемпотентным скриптом:
+
+```powershell
+$env:PYTHONPATH = "C:\Users\MILLER\Downloads\HH7d\tools\pyfix"
+Set-Location "C:\Users\MILLER\Downloads\HH7d\backend"
+& "..\.venv\Scripts\python.exe" scripts\seed_demo.py
+```
+
+Любой другой аккаунт можно создать через форму регистрации или
+`POST /api/auth/register`.
+
+## Структура проекта
+
+```
+HH7d/
+├─ backend/
+│  ├─ app/
+│  │  ├─ main.py          — точка входа FastAPI, CORS, монтирование SPA
+│  │  ├─ config.py        — настройки (Pydantic Settings, .env)
+│  │  ├─ db.py            — движок SQLite, Base, init_db(), get_db()
+│  │  ├─ models.py        — ORM-модели (users, interview_sessions, questions, answers, …)
+│  │  ├─ schemas.py       — Pydantic-схемы API (контракт docs/API.md)
+│  │  ├─ security.py      — PBKDF2-хеширование паролей, JWT (HS256)
+│  │  ├─ deps.py          — зависимости: get_db, get_current_user
+│  │  ├─ routers/         — auth, users, meta, interviews, analytics, chat, code, ai_health, voice
+│  │  ├─ ai/              — base.py (контракт AIService), factory.py, service.py (fallback),
+│  │  │                      live.py, offline.py, prompts.py, providers.py
+│  │  ├─ data/            — catalog.py (справочники), question_bank.py (банк вопросов и задач)
+│  │  └─ static/          — собранный React-бандл (результат npm run build)
+│  ├─ data/               — SQLite-файл app.db (создаётся автоматически)
+│  ├─ scripts/            — smoke_check.py, seed_demo.py
+│  ├─ tests/              — pytest-набор
+│  ├─ requirements.txt
+│  └─ .env.example
+├─ frontend/              — React + TypeScript + Vite + Tailwind
+│  ├─ src/pages/          — LoginPage, RegisterPage, DashboardPage, NewInterviewPage,
+│  │                        InterviewPage, ReportPage, ChatPage, CodePage, HistoryPage,
+│  │                        ProfilePage, NotFoundPage
+│  ├─ src/components/     — Layout, EvaluationPanel, CodeEditor, ui/* и др.
+│  ├─ src/lib/            — api.ts (JWT, ошибки, SSE), types.ts, labels.ts, format.ts
+│  └─ README.md           — запуск dev/build, структура, известные ограничения
+├─ docs/                  — проектная документация (см. ниже)
+├─ docs/word/             — те же документы в формате Word (.docx)
+├─ scripts/               — setup.ps1, start.ps1, dev.ps1, build_frontend.ps1
+├─ tools/                 — pyfix (обход ACL песочницы), live_check.py, md_to_docx.py
+└─ README.md
+```
+
+## Документация
+
+| Документ | Содержание |
+|---|---|
+| [docs/01-ТЗ.md](docs/01-ТЗ.md) | Техническое задание: цели, функциональные и нефункциональные требования, ограничения, критерии приёмки, этапы |
+| [docs/02-Архитектура.md](docs/02-Архитектура.md) | Архитектура: слои, компоненты, схема БД, последовательности, ИИ-слой, безопасность, развёртывание |
+| [docs/03-Сценарии.md](docs/03-Сценарии.md) | Пользовательские сценарии с основными и альтернативными потоками |
+| [docs/04-ПЗ.md](docs/04-ПЗ.md) | Пояснительная записка: анализ предметной области, проектирование, реализация, ИИ-компонент, тестирование, заключение |
+| [docs/05-Тестирование.md](docs/05-Тестирование.md) | Стратегия тестирования, уровни, тест-кейсы, трассировка требований |
+| [docs/API.md](docs/API.md) | Контракт REST API (единый источник истины для бэкенда и фронтенда) |
+| [docs/DEV_SETUP.md](docs/DEV_SETUP.md) | Внутренняя инструкция по окружению и правилам разработки |
+
+## Тесты
+
+```powershell
+$ws = "C:\Users\MILLER\Downloads\HH7d"
+$env:PYTHONPATH = "$ws\tools\pyfix"
+Set-Location "$ws\backend"
+& "$ws\.venv\Scripts\python.exe" -m pytest -q
+```
+
+Набор насчитывает 196 проверок (10 модулей, включая параметризованные тесты) и
+проходит полностью. Сквозная проверка без запуска сервера — 26 контрольных
+точек основного сценария:
+
+```powershell
+& "$ws\.venv\Scripts\python.exe" scripts\smoke_check.py
+```
+
+Проверка живого сервера по HTTP (API + статика + SSE-чат) — 32 контрольные точки:
+
+```powershell
+& "$ws\.venv\Scripts\python.exe" tools\live_check.py http://127.0.0.1:8000
+```
+
+## Режимы ИИ
+
+| `AI_PROVIDER` | Поведение |
+|---|---|
+| `auto` (по умолчанию) | Если задан `AI_API_KEY` — Live-движок, иначе Offline-движок |
+| `openai` | Любой OpenAI-совместимый API: OpenAI, OpenRouter, DeepSeek, VseGPT и др. |
+| `ollama` | Локальная модель через Ollama (`http://localhost:11434/v1`), без ключа |
+| `offline` | Принудительно встроенный офлайн-движок (демонстрация без ключа и сети) |
+
+Даже при активном Live-движке любой сбой внешней модели (таймаут, ошибка HTTP,
+невалидный JSON) приводит к прозрачному переключению на офлайн-движок — пользователь
+получает ответ в любом случае. Текущий режим виден в интерфейсе и в `GET /api/ai/health`.

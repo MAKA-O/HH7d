@@ -32,6 +32,7 @@ class UserOut(BaseModel):
     full_name: str = ""
     target_role: str = "backend"
     target_level: str = "junior"
+    resume_text: str | None = None
     created_at: datetime
 
 

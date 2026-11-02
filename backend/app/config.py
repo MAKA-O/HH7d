@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
 
     # Безопасность
-    secret_key: str = "dev-secret-change-me-in-production"
+    secret_key: str = "dev-secret-change-me-in-production-please-use-32-bytes-min"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 дней
 
     # База данных (SQLite по умолчанию, кладём рядом с backend/)

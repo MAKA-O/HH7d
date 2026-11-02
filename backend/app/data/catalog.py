@@ -146,8 +146,9 @@ def normalize_role(code: str | None) -> str:
 
 
 def meta_payload() -> dict[str, Any]:
+    level_codes = [item["code"] for item in LEVELS]
     return {
-        "roles": ROLES,
+        "roles": [{**role, "levels": level_codes} for role in ROLES],
         "levels": LEVELS,
         "modes": MODES,
         "question_types": QUESTION_TYPES,
