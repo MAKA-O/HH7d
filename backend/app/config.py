@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Интеллектуальный тренажёр для подготовки к собеседованиям"
-    app_version: str = "1.0.0"
+    app_version: str = "1.1.0"
     debug: bool = True
     api_prefix: str = "/api"
 

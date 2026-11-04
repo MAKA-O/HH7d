@@ -61,7 +61,7 @@ def test_explicit_gemini_base_url_is_respected():
 
 
 def test_offline_without_key_keeps_offline_mode():
-    settings = Settings(ai_provider="gemini", ai_api_key="")
+    settings = Settings(ai_provider="gemini", ai_api_key="", ai_api_keys="")
     assert settings.ai_enabled is False
 
 

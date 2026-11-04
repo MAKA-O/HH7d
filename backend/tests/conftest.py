@@ -29,6 +29,7 @@ atexit.register(shutil.rmtree, _RUN_DIR, True)
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH.as_posix()}"
 os.environ["AI_PROVIDER"] = "offline"
 os.environ["AI_API_KEY"] = ""
+os.environ["AI_API_KEYS"] = ""
 os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-only-0123456789abcdef"
 
 if str(BACKEND_DIR) not in sys.path:

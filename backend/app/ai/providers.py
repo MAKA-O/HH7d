@@ -386,7 +386,7 @@ class LLMClient:
             self._client = httpx.Client(
                 timeout=self._make_timeout(self.timeout),
                 follow_redirects=True,
-                headers={"User-Agent": "interview-trainer/1.0"},
+                headers={"User-Agent": "interview-trainer/1.1"},
             )
         return self._client
 

@@ -1,7 +1,7 @@
 {
   "name": "interview-trainer-frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "SPA тренажёра для подготовки к собеседованиям (React 18 + TypeScript + Vite + Tailwind)",
   "scripts": {
